@@ -1,3 +1,4 @@
+import './testDb.js';
 import express from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
@@ -7,6 +8,7 @@ import mongoose from 'mongoose';
 
 import connectDB from '../config/db.js';
 import User from '../models/user.model.js';
+import { isBloodCompatible } from '../utils/bloodCompatibility.js';
 import healthRouter from '../routes/health.routes.js';
 import authRouter from '../routes/auth.routes.js';
 import donorRouter from '../routes/donor.routes.js';
@@ -279,10 +281,13 @@ const runSuite = async () => {
   const t16 = await request('/api/donors/search');
   record('TEST 16', 'Unauthenticated donor search', 401, t16.status);
 
-  // 17. Blood group filter
+  // 17. Blood group filter (recipient A+ receives from compatible donors: O-, O+, A-, A+)
   const t17 = await request('/api/donors/search?bloodGroup=A%2B', { headers: { Cookie: recipientCookie } });
-  const onlyAPlus = t17.data.donors && t17.data.donors.every((d) => d.bloodGroup === 'A+');
-  record('TEST 17', 'Blood group filter (A+)', 200, t17.status, onlyAPlus);
+  const compatibleWithAPlus =
+    t17.data.donors &&
+    t17.data.donors.length > 0 &&
+    t17.data.donors.every((d) => isBloodCompatible(d.bloodGroup, 'A+'));
+  record('TEST 17', 'Compatible blood group filter (A+)', 200, t17.status, compatibleWithAPlus);
 
   // 18. Availability filter (unavailable donors excluded)
   const t18 = await request('/api/donors/search', { headers: { Cookie: recipientCookie } });

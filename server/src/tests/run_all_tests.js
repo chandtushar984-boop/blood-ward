@@ -1,29 +1,47 @@
 import { spawn } from 'child_process';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { enforceTestEnvironment, getTestMongoUri } from './testDb.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+// Hard safety guard: enforce test environment and verify test database isolation
+const testMongoUri = enforceTestEnvironment();
 
 const testSuites = [
   { name: "Admin Bootstrap", file: "run_admin_bootstrap_tests.js" },
   { name: "RBAC Suite", file: "run_rbac_tests.js" },
   { name: "Phase 5 + 6 (Donor & Search)", file: "run_phase5_phase6_tests.js" },
+  { name: "Recipient Blood Compatibility", file: "run_recipient_blood_compatibility_tests.js" },
   { name: "Phase 7 (Request Lifecycle)", file: "run_phase7_tests.js" },
   { name: "Phase 8 (Admin Mgmt & Audit)", file: "run_phase8_tests.js" },
   { name: "Recipient & Any Location", file: "run_recipient_location_and_any_location_tests.js" },
   { name: "Donor Geo Persistence", file: "run_donor_geo_persistence_tests.js" },
   { name: "Availability Persistence", file: "run_availability_persistence_test.js" },
   { name: "Gender Dropdown & Privacy", file: "run_gender_tests.js" },
+  { name: "Donor DOB & Gender Validation", file: "run_donor_dob_tests.js" },
   { name: "Full Integration Correction", file: "run_full_integration_tests.js" },
   { name: "Final Logic Consistency", file: "run_consistency_tests.js" },
   { name: "Location Integrity Suite", file: "run_location_integrity_tests.js" },
+  { name: "E2E Persistence", file: "run_e2e_persistence_tests.js" },
+  { name: "Dynamic Radius & Expansion", file: "run_dynamic_radius_tests.js" },
+  { name: "Global Theme Verification", file: "run_theme_verification_tests.js" },
+  { name: "Session Endpoint & Public Auth", file: "run_session_endpoint_tests.js" },
+  { name: "Phase 1 Verification", file: "run_phase1_verification_tests.js" },
+  { name: "Phase 2 Verification", file: "run_phase2_verification_tests.js" },
+  { name: "Phase 3 Verification", file: "run_phase3_verification_tests.js" },
 ];
 
 async function runSingleSuite(suite) {
   return new Promise((resolve) => {
     const filePath = path.join(__dirname, suite.file);
-    const proc = spawn("node", [filePath], {
-      env: process.env,
+    const proc = spawn(process.execPath, [filePath], {
+      env: {
+        ...process.env,
+        NODE_ENV: 'test',
+        MONGODB_URI: testMongoUri,
+        MONGODB_TEST_URI: testMongoUri,
+      },
       stdio: ["pipe", "pipe", "pipe"],
     });
 
@@ -64,6 +82,8 @@ async function runSingleSuite(suite) {
 async function runAll() {
   console.log("==================================================");
   console.log("RUNNING ALL BLOODWARD AUTOMATED TEST SUITES...");
+  console.log("DATABASE ISOLATION: Automated Test Database (bloodward_test)");
+  console.log("PRODUCTION GUARD: ACTIVE (bloodward database protected)");
   console.log("==================================================\n");
 
   const results = [];
@@ -82,7 +102,7 @@ async function runAll() {
   console.log("--------------------------------------------------");
   for (const r of results) {
     const padName = r.name.padEnd(30, " ");
-    console.log(`${padName} ${r.passed} / ${r.total}`);
+    console.log(`${padName} ${r.passed} / ${r.total}${r.code !== 0 ? ` (exit: ${r.code})` : ''}`);
   }
   console.log("--------------------------------------------------");
   console.log(`TOTAL                         ${grandPassed} / ${grandTotal}`);

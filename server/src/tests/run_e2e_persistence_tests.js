@@ -1,3 +1,4 @@
+import './testDb.js';
 import express from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
@@ -101,6 +102,7 @@ async function runTests() {
       phone: '9876543210',
       password: 'password123',
       bloodGroup: 'O+',
+      dateOfBirth: '1995-05-15',
       isAvailable: false,
     },
   });
