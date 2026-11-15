@@ -30,6 +30,52 @@ const pointSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const healthQuestionnaireSchema = new mongoose.Schema(
+  {
+    currentWeight: {
+      type: Number,
+      default: null,
+    },
+    medicalConditions: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+    medications: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+    recentIllnessOrFever: {
+      type: Boolean,
+      default: false,
+    },
+    recentSurgery: {
+      type: Boolean,
+      default: false,
+    },
+    previousDonation: {
+      type: Boolean,
+      default: false,
+    },
+    lastDonationDate: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+    additionalNotes: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+    updatedAt: {
+      type: Date,
+      default: null,
+    },
+  },
+  { _id: false }
+);
+
 const userSchema = new mongoose.Schema(
   {
     username: {
@@ -58,9 +104,68 @@ const userSchema = new mongoose.Schema(
     },
     gender: {
       type: String,
-      enum: ["Male", "Female", "Other", "Prefer not to say", ""],
+      enum: ["Male", "Female", "Non-binary", "Other", "Prefer not to say", ""],
       default: "",
       trim: true,
+    },
+    dateOfBirth: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+    healthQuestionnaire: {
+      type: healthQuestionnaireSchema,
+      default: () => ({}),
+    },
+    // Recipient & Hospital Representative specific fields
+    accountType: {
+      type: String,
+      enum: ["individual", "hospital_rep"],
+      default: "individual",
+    },
+    hospitalName: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+    hospitalAddress: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+    hospitalContactPhone: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+    representativeDesignation: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+    authorizationNotes: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+    verificationStatus: {
+      type: String,
+      enum: ["pending", "verified", "rejected"],
+      default: "verified",
+    },
+    verificationRejectionReason: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+    verifiedAt: {
+      type: Date,
+      default: null,
+    },
+    verifiedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
     },
     profilePhoto: {
       type: String,

@@ -3,6 +3,7 @@ import { DEFAULT_MATCHING_RADIUS_KM } from './config/constants.js';
 import { Server } from "socket.io";
 import jwt from "jsonwebtoken";
 import User from "./models/user.model.js";
+import BloodRequest from "./models/bloodRequest.js";
 import { getCityCoordinates } from "./utils/cityCoordinates.js";
 
 let io = null;
@@ -104,15 +105,19 @@ export const emitToRole = (role, event, payload) => {
 
 /**
  * Notify matching available donors of a new blood request
+ * @param {Object} bloodRequest - Blood request mongoose document or object
+ * @param {boolean} newlyEligibleOnly - If true, only notify donors not already in notifiedDonors
+ * @returns {Promise<number>} - Count of newly notified donors
  */
-export const notifyMatchingDonors = async (bloodRequest) => {
-  if (!io) return;
+export const notifyMatchingDonors = async (bloodRequest, newlyEligibleOnly = false) => {
+  if (!io) return 0;
   try {
     if (!bloodRequest.location || !Array.isArray(bloodRequest.location.coordinates) || bloodRequest.location.coordinates.length < 2) {
       console.log("[Socket.IO] Skipping notify: Blood request has no valid coordinates.");
-      return;
+      return 0;
     }
 
+    const matchRadius = bloodRequest.radiusKm || DEFAULT_MATCHING_RADIUS_KM;
     const matchCriteria = {
       role: "donor",
       availability: "available",
@@ -128,12 +133,28 @@ export const notifyMatchingDonors = async (bloodRequest) => {
       unitsNeeded: bloodRequest.unitsNeeded,
       hospitalName: bloodRequest.hospitalName,
       city: bloodRequest.city,
+      state: bloodRequest.state || "",
       urgency: bloodRequest.urgency,
       requiredDate: bloodRequest.requiredDate,
+      radiusKm: matchRadius,
+      location: bloodRequest.location,
       createdAt: bloodRequest.createdAt,
     };
 
+    const currentNotified = Array.isArray(bloodRequest.notifiedDonors)
+      ? bloodRequest.notifiedDonors.map((id) => id.toString())
+      : [];
+    const notifiedSet = new Set(currentNotified);
+    const updatedNotified = [...currentNotified];
+    let newNotificationsCount = 0;
+
     for (const donor of potentialDonors) {
+      const donorIdStr = donor._id.toString();
+
+      if (newlyEligibleOnly && notifiedSet.has(donorIdStr)) {
+        continue;
+      }
+
       // Check blood group compatibility
       if (!isBloodCompatible(donor.bloodGroup, bloodRequest.bloodGroup)) {
         continue;
@@ -163,14 +184,32 @@ export const notifyMatchingDonors = async (bloodRequest) => {
       const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
       const dist = Math.round(R * c * 10) / 10;
 
-      if (dist <= DEFAULT_MATCHING_RADIUS_KM) {
+      if (dist <= matchRadius) {
+        if (!notifiedSet.has(donorIdStr)) {
+          notifiedSet.add(donorIdStr);
+          updatedNotified.push(donor._id);
+          newNotificationsCount++;
+        }
         emitToUser(donor._id, "bloodRequest:new", privacySafePayload);
+        emitToUser(donor._id, "request:created", privacySafePayload);
+        if (newlyEligibleOnly) {
+          emitToUser(donor._id, "bloodRequest:radius_expanded", privacySafePayload);
+          emitToUser(donor._id, "request:radius_expanded", privacySafePayload);
+        }
         if (bloodRequest.urgency === "Emergency") {
           emitToUser(donor._id, "bloodRequest:emergency", privacySafePayload);
         }
       }
     }
+
+    // Persist notifiedDonors in DB
+    await BloodRequest.findByIdAndUpdate(bloodRequest._id, {
+      $set: { notifiedDonors: updatedNotified },
+    });
+
+    return newNotificationsCount;
   } catch (err) {
     console.error("[Socket.IO] Error notifying matching donors:", err.message);
+    return 0;
   }
 };

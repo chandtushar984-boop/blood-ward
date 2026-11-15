@@ -1,9 +1,23 @@
+const formatRequiredDate = (val) => {
+  if (!val) return '';
+  const str = String(val).trim();
+  const match = str.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (match) return `${match[1]}-${match[2]}-${match[3]}`;
+  const parsed = new Date(str);
+  if (!Number.isNaN(parsed.getTime())) {
+    return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(parsed);
+  }
+  return str;
+};
+
 export const sanitizeBloodRequest = (doc, userRole = null, userId = null) => {
   if (!doc) return null;
 
   const isOwner = userId && doc.recipient && (doc.recipient._id || doc.recipient).toString() === userId.toString();
   const isAcceptedDonor = userId && doc.acceptedDonor && (doc.acceptedDonor._id || doc.acceptedDonor).toString() === userId.toString();
   const isAdmin = userRole === 'admin';
+
+  const normalizedRequiredDate = formatRequiredDate(doc.requiredDate);
 
   // Base fields visible to authorized participants
   const baseRequest = {
@@ -17,7 +31,8 @@ export const sanitizeBloodRequest = (doc, userRole = null, userId = null) => {
     location: doc.location || null,
     urgency: doc.urgency,
     status: doc.status,
-    requiredDate: doc.requiredDate,
+    requiredDate: normalizedRequiredDate,
+    radiusKm: doc.radiusKm || 20,
     additionalNotes: doc.additionalNotes || '',
     donorResponsesCount: doc.donorResponsesCount || 0,
     acceptedDonor: doc.acceptedDonor ? (doc.acceptedDonor._id || doc.acceptedDonor) : null,
@@ -48,7 +63,8 @@ export const sanitizeBloodRequest = (doc, userRole = null, userId = null) => {
     city: doc.city,
     urgency: doc.urgency,
     status: doc.status,
-    requiredDate: doc.requiredDate,
+    requiredDate: normalizedRequiredDate,
+    radiusKm: doc.radiusKm || 20,
     additionalNotes: doc.additionalNotes || '',
     donorResponsesCount: doc.donorResponsesCount || 0,
     createdAt: doc.createdAt,

@@ -75,6 +75,7 @@ const bloodRequestSchema = new mongoose.Schema(
       required: true,
       enum: [
         'Created',
+        'Pending Verification',
         'Active',
         'Donor Accepted',
         'In Progress',
@@ -104,6 +105,15 @@ const bloodRequestSchema = new mongoose.Schema(
       default: null,
     },
     declinedDonors: [{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+    }],
+    radiusKm: {
+      type: Number,
+      enum: [5, 10, 20, 30, 50],
+      default: 20,
+    },
+    notifiedDonors: [{
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
     }],

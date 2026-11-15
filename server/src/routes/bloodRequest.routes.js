@@ -10,6 +10,7 @@ import {
   markInProgress,
   fulfillBloodRequest,
   cancelBloodRequest,
+  expandBloodRequestRadius,
 } from '../controllers/bloodRequestController.js';
 import { protect, restrictTo } from '../middleware/authMiddleware.js';
 
@@ -18,6 +19,8 @@ const router = express.Router();
 // Recipient request creation and personal list
 router.post('/', protect, restrictTo('recipient'), createBloodRequest);
 router.get('/my', protect, restrictTo('recipient'), getMyRequests);
+router.patch('/:id/expand-radius', protect, restrictTo('recipient'), expandBloodRequestRadius);
+router.patch('/:id/radius', protect, restrictTo('recipient'), expandBloodRequestRadius);
 
 // Available active requests for donors
 router.get('/available', protect, restrictTo('donor'), getAvailableRequests);

@@ -14,6 +14,7 @@
     "test:phase8": "node src/tests/run_phase8_tests.js",
     "test:integration": "node src/tests/run_full_integration_tests.js",
     "test:admin": "node src/tests/run_admin_bootstrap_tests.js",
+    "test:compatibility": "node src/tests/run_recipient_blood_compatibility_tests.js",
     "test:all": "node src/tests/run_all_tests.js"
   },
   "dependencies": {

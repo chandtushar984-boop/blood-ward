@@ -1,10 +1,16 @@
 import User from "../models/user.model.js";
 import AppError from "../utils/appError.js";
+import { emitToRole } from "../socket.js";
+import { logAuditEvent } from "../utils/auditLogger.js";
+import { getCompatibleDonorBloodGroups } from "../utils/bloodCompatibility.js";
 import {
   isValidGeoCoordinates,
   isValidBloodGroup,
   isValidAvailability,
   isValidPincode,
+  normalizeIndianPhone,
+  ALLOWED_GENDERS,
+  validateDonorDOB,
 } from "../utils/validators.js";
 import {
   sanitizeDonorProfile,
@@ -35,7 +41,20 @@ export const getDonorProfile = async (req, res, next) => {
  */
 export const updateDonorProfile = async (req, res, next) => {
   try {
-    const { bloodGroup, state, city, pincode, fullName, phone, gender, availability, isAvailable, location } = req.body;
+    const {
+      bloodGroup,
+      state,
+      city,
+      pincode,
+      fullName,
+      phone,
+      gender,
+      dateOfBirth,
+      healthQuestionnaire,
+      availability,
+      isAvailable,
+      location,
+    } = req.body;
 
     if (location !== undefined && location !== null) {
       if (
@@ -68,14 +87,15 @@ export const updateDonorProfile = async (req, res, next) => {
     }
 
     if (phone !== undefined) {
-      if (typeof phone !== "string" || !phone.trim()) {
-        return next(new AppError("Phone number must be a valid non-empty string.", 400));
+      const normalizedPhone = normalizeIndianPhone(phone);
+      if (!normalizedPhone) {
+        return next(new AppError("Please provide a valid 10-digit Indian mobile number.", 400));
       }
-      req.user.phone = phone.trim();
+      req.user.phone = normalizedPhone;
     }
 
     if (gender !== undefined) {
-      if (gender !== "" && !["Male", "Female", "Other", "Prefer not to say"].includes(gender)) {
+      if (gender !== "" && !ALLOWED_GENDERS.includes(gender)) {
         return next(new AppError("Invalid gender value provided.", 400));
       }
       req.user.gender = gender ? gender.trim() : "";
@@ -114,8 +134,46 @@ export const updateDonorProfile = async (req, res, next) => {
       req.user.pincode = typeof pincode === "string" ? pincode.trim() : "";
     }
 
+    if (dateOfBirth !== undefined) {
+      if (dateOfBirth !== "" && dateOfBirth !== null) {
+        const dobValidation = validateDonorDOB(dateOfBirth);
+        if (!dobValidation.isValid) {
+          return next(new AppError(dobValidation.message, 400));
+        }
+      }
+      req.user.dateOfBirth = dateOfBirth ? String(dateOfBirth).trim() : "";
+    }
+
+    if (healthQuestionnaire && typeof healthQuestionnaire === "object") {
+      const q = req.user.healthQuestionnaire || {};
+      req.user.healthQuestionnaire = {
+        currentWeight: healthQuestionnaire.currentWeight !== undefined && healthQuestionnaire.currentWeight !== "" ? (healthQuestionnaire.currentWeight !== null ? Number(healthQuestionnaire.currentWeight) : null) : q.currentWeight,
+        medicalConditions: healthQuestionnaire.medicalConditions !== undefined ? String(healthQuestionnaire.medicalConditions).trim() : (q.medicalConditions || ""),
+        medications: healthQuestionnaire.medications !== undefined ? String(healthQuestionnaire.medications).trim() : (q.medications || ""),
+        recentIllnessOrFever: healthQuestionnaire.recentIllnessOrFever !== undefined ? Boolean(healthQuestionnaire.recentIllnessOrFever) : (q.recentIllnessOrFever || false),
+        recentSurgery: healthQuestionnaire.recentSurgery !== undefined ? Boolean(healthQuestionnaire.recentSurgery) : (q.recentSurgery || false),
+        previousDonation: healthQuestionnaire.previousDonation !== undefined ? Boolean(healthQuestionnaire.previousDonation) : (q.previousDonation || false),
+        lastDonationDate: healthQuestionnaire.lastDonationDate !== undefined ? String(healthQuestionnaire.lastDonationDate).trim() : (q.lastDonationDate || ""),
+        additionalNotes: healthQuestionnaire.additionalNotes !== undefined ? String(healthQuestionnaire.additionalNotes).trim() : (q.additionalNotes || ""),
+        updatedAt: new Date(),
+      };
+    }
+
     req.user.lastActiveAt = new Date();
     await req.user.save({ validateBeforeSave: true });
+
+    if (availability !== undefined || isAvailable !== undefined) {
+      const availPayload = {
+        donorId: req.user._id.toString(),
+        availability: req.user.availability,
+        isAvailable: req.user.availability === "available",
+        bloodGroup: req.user.bloodGroup,
+        city: req.user.city,
+        state: req.user.state,
+      };
+      emitToRole("recipient", "donor:availabilityChanged", availPayload);
+      emitToRole("recipient", "donor:availability_updated", availPayload);
+    }
 
     res.status(200).json({
       success: true,
@@ -147,6 +205,17 @@ export const updateDonorAvailability = async (req, res, next) => {
     req.user.lastActiveAt = new Date();
 
     await req.user.save({ validateBeforeSave: false });
+
+    const availPayload = {
+      donorId: req.user._id.toString(),
+      availability: req.user.availability,
+      isAvailable: req.user.availability === "available",
+      bloodGroup: req.user.bloodGroup,
+      city: req.user.city,
+      state: req.user.state,
+    };
+    emitToRole("recipient", "donor:availabilityChanged", availPayload);
+    emitToRole("recipient", "donor:availability_updated", availPayload);
 
     res.status(200).json({
       success: true,
@@ -220,7 +289,8 @@ export const searchDonors = async (req, res, next) => {
     };
 
     if (bloodGroup && typeof bloodGroup === "string" && bloodGroup.trim() !== "") {
-      matchCriteria.bloodGroup = bloodGroup.trim();
+      const compatibleDonorGroups = getCompatibleDonorBloodGroups(bloodGroup.trim());
+      matchCriteria.bloodGroup = { $in: compatibleDonorGroups };
     }
 
     if (isAnyLocation) {
@@ -354,6 +424,89 @@ export const searchDonors = async (req, res, next) => {
       page: pageNum,
       totalPages,
       donors: sanitizedDonors,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Get donor self-reported health questionnaire
+ * @route   GET /api/donors/me/health-questionnaire
+ * @access  Private (Donor only)
+ */
+export const getHealthQuestionnaire = async (req, res, next) => {
+  try {
+    res.status(200).json({
+      success: true,
+      healthQuestionnaire: req.user.healthQuestionnaire || {},
+      disclaimer:
+        "Preliminary self-reported information only. This does not certify medical eligibility. Formal clinical clearance must be conducted by certified medical/blood-bank personnel prior to donation.",
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Update donor self-reported health questionnaire
+ * @route   PUT /api/donors/me/health-questionnaire
+ * @access  Private (Donor only)
+ */
+export const updateHealthQuestionnaire = async (req, res, next) => {
+  try {
+    const {
+      currentWeight,
+      medicalConditions,
+      medications,
+      recentIllnessOrFever,
+      recentSurgery,
+      previousDonation,
+      lastDonationDate,
+      additionalNotes,
+    } = req.body;
+
+    const parsedWeight =
+      currentWeight !== undefined && currentWeight !== null && currentWeight !== ""
+        ? Number(currentWeight)
+        : null;
+
+    if (parsedWeight !== null && (Number.isNaN(parsedWeight) || parsedWeight < 20 || parsedWeight > 300)) {
+      return next(new AppError("Current weight must be a valid number between 20 kg and 300 kg.", 400));
+    }
+
+    const updatedQuestionnaire = {
+      currentWeight: parsedWeight,
+      medicalConditions: medicalConditions ? String(medicalConditions).trim() : "",
+      medications: medications ? String(medications).trim() : "",
+      recentIllnessOrFever: Boolean(recentIllnessOrFever),
+      recentSurgery: Boolean(recentSurgery),
+      previousDonation: Boolean(previousDonation),
+      lastDonationDate: lastDonationDate ? String(lastDonationDate).trim() : "",
+      additionalNotes: additionalNotes ? String(additionalNotes).trim() : "",
+      updatedAt: new Date(),
+    };
+
+    req.user.healthQuestionnaire = updatedQuestionnaire;
+    await req.user.save({ validateBeforeSave: false });
+
+    logAuditEvent({
+      actor: req.user._id,
+      actorName: req.user.fullName,
+      action: "UPDATE_HEALTH_QUESTIONNAIRE",
+      category: "DONOR_ACTION",
+      target: req.user._id.toString(),
+      ipAddress: req.ip,
+      severity: "NORMAL",
+      details: `Donor updated health questionnaire. Weight: ${parsedWeight || "N/A"} kg.`,
+    });
+
+    res.status(200).json({
+      success: true,
+      message: "Health questionnaire updated successfully.",
+      healthQuestionnaire: req.user.healthQuestionnaire,
+      disclaimer:
+        "Preliminary self-reported information only. This does not certify medical eligibility. Formal clinical clearance must be conducted by certified medical/blood-bank personnel prior to donation.",
     });
   } catch (error) {
     next(error);
