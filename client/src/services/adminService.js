@@ -55,6 +55,15 @@ export const adminService = {
     }
   },
 
+  async verifyUser(id, data) {
+    try {
+      const response = await api.patch("/admin/users/" + id + "/verification", data);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: "Failed to update verification status" };
+    }
+  },
+
   async getRequests(params) {
     try {
       const response = await api.get("/admin/requests", { params });

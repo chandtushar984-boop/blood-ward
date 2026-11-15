@@ -14,6 +14,7 @@ import {
   Clock,
   CheckCircle2,
   Inbox,
+  UserCheck,
 } from 'lucide-react';
 import AdminSummaryStats from '../../components/admin/AdminSummaryStats';
 
@@ -66,9 +67,9 @@ export default function AdminDashboardPage() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="text-center space-y-4">
-          <div className="w-10 h-10 border-4 border-amber-500 border-t-transparent rounded-full animate-spin mx-auto" />
-          <p className="text-sm font-semibold text-slate-600">Loading Admin Dashboard...</p>
+        <div className="text-center space-y-3">
+          <div className="w-8 h-8 border-2 border-slate-300 border-t-slate-800 dark:border-t-slate-100 rounded-full animate-spin mx-auto" />
+          <p className="text-xs font-medium text-[#64748B] dark:text-[#94A3B8]">Loading Admin Dashboard...</p>
         </div>
       </div>
     );
@@ -77,13 +78,13 @@ export default function AdminDashboardPage() {
   if (error) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="bg-white p-8 rounded-3xl border border-rose-200 shadow-sm text-center space-y-4 max-w-md">
-          <AlertTriangle className="w-10 h-10 text-rose-500 mx-auto" />
-          <h3 className="text-lg font-extrabold text-slate-900">Dashboard Error</h3>
-          <p className="text-sm text-slate-600">{error}</p>
+        <div className="bg-white dark:bg-[#181B21] p-8 rounded-xl border border-rose-200 dark:border-rose-900/50 shadow-sm text-center space-y-4 max-w-md">
+          <AlertTriangle className="w-8 h-8 text-rose-500 mx-auto" />
+          <h3 className="text-base font-bold text-[#1E293B] dark:text-[#F1F5F9]">Dashboard Error</h3>
+          <p className="text-xs text-[#64748B] dark:text-[#94A3B8]">{error}</p>
           <button
             onClick={() => window.location.reload()}
-            className="px-5 py-2 rounded-xl bg-amber-500 text-white text-xs font-bold hover:bg-amber-600 transition-colors"
+            className="px-4 py-2 rounded-lg bg-[#1E293B] dark:bg-[#252A33] text-white text-xs font-semibold hover:bg-slate-800 transition-colors"
           >
             Retry
           </button>
@@ -93,33 +94,29 @@ export default function AdminDashboardPage() {
   }
 
   return (
-    <div className="space-y-8 pb-12">
+    <div className="space-y-6 pb-12">
       {/* 1. ADMIN OVERVIEW HEADER */}
-      <div className="bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-white p-6 sm:p-8 rounded-3xl shadow-xl relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-80 h-80 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
-
-        <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-          <div className="space-y-2">
-            <div className="flex items-center gap-2.5">
-              <div className="w-10 h-10 rounded-2xl bg-amber-500 text-slate-950 flex items-center justify-center font-extrabold shadow-lg">
-                <Shield className="w-6 h-6 fill-current" />
-              </div>
-              <div>
-                <h1 className="text-2xl sm:text-3xl font-black tracking-tight">
-                  Admin Monitoring Console
-                </h1>
-                <p className="text-xs text-theme-muted">
-                  Platform governance, user management, and security audit log oversight
-                </p>
-              </div>
+      <div className="bg-white dark:bg-[#181B21] text-[#1E293B] dark:text-[#F1F5F9] p-6 sm:p-7 rounded-xl border border-[#E2E8F0] dark:border-[#343B47] shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-6 transition-colors">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-lg bg-[#1E293B] text-white dark:bg-[#252A33] dark:text-white flex items-center justify-center font-bold">
+              <Shield className="w-4 h-4 fill-current" />
+            </div>
+            <div>
+              <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[#1E293B] dark:text-[#F1F5F9]">
+                Admin Monitoring Console
+              </h1>
+              <p className="text-xs text-[#64748B] dark:text-[#94A3B8]">
+                Platform governance, user management, and security audit log oversight
+              </p>
             </div>
           </div>
+        </div>
 
-          <div className="flex items-center gap-3">
-            <span className="px-3 py-1.5 rounded-full text-xs font-mono font-bold bg-amber-500/10 text-amber-400 border border-amber-500/30 flex items-center gap-1.5">
-              <ShieldCheck className="w-4 h-4" /> System Online & Guarded
-            </span>
-          </div>
+        <div className="flex items-center gap-2">
+          <span className="px-2.5 py-1 rounded-md text-xs font-medium bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/50 flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> System Active & Guarded
+          </span>
         </div>
       </div>
 
@@ -130,65 +127,65 @@ export default function AdminDashboardPage() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div
           onClick={() => navigate('/admin/donors')}
-          className="bg-theme-card p-5 rounded-2xl border border-theme shadow-xs hover:shadow-md transition-all cursor-pointer group space-y-3"
+          className="bg-white dark:bg-[#181B21] p-5 rounded-xl border border-[#E2E8F0] dark:border-[#343B47] shadow-xs hover:border-[#315B83] dark:hover:border-sky-500 transition-all cursor-pointer group space-y-3"
         >
           <div className="flex items-center justify-between">
-            <div className="p-2.5 rounded-xl bg-red-50 text-red-600 group-hover:scale-105 transition-transform">
-              <Users className="w-5 h-5" />
+            <div className="p-2 rounded-lg bg-[#F1F5F9] dark:bg-[#20242C] text-[#1E293B] dark:text-[#F1F5F9] border border-[#E2E8F0] dark:border-[#343B47]">
+              <Users className="w-4 h-4" />
             </div>
-            <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-red-600 transition-colors" />
+            <ArrowRight className="w-4 h-4 text-[#64748B] dark:text-[#94A3B8] group-hover:text-[#1E293B] dark:group-hover:text-white transition-colors" />
           </div>
           <div>
-            <h4 className="font-extrabold text-theme-primary text-sm">Manage Donors</h4>
-            <p className="text-[11px] text-theme-secondary">View & audit donor accounts</p>
+            <h4 className="font-semibold text-[#1E293B] dark:text-[#F1F5F9] text-sm">Manage Donors</h4>
+            <p className="text-[11px] text-[#64748B] dark:text-[#94A3B8]">View & audit donor accounts</p>
           </div>
         </div>
 
         <div
           onClick={() => navigate('/admin/recipients')}
-          className="bg-theme-card p-5 rounded-2xl border border-theme shadow-xs hover:shadow-md transition-all cursor-pointer group space-y-3"
+          className="bg-white dark:bg-[#181B21] p-5 rounded-xl border border-[#E2E8F0] dark:border-[#343B47] shadow-xs hover:border-[#315B83] dark:hover:border-sky-500 transition-all cursor-pointer group space-y-3"
         >
           <div className="flex items-center justify-between">
-            <div className="p-2.5 rounded-xl bg-blue-50 text-blue-600 group-hover:scale-105 transition-transform">
-              <Users className="w-5 h-5" />
+            <div className="p-2 rounded-lg bg-[#F0F7FF] dark:bg-sky-950/40 text-[#315B83] dark:text-sky-300 border border-[#BFDBFE] dark:border-sky-800/50">
+              <UserCheck className="w-4 h-4" />
             </div>
-            <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-blue-600 transition-colors" />
+            <ArrowRight className="w-4 h-4 text-[#64748B] dark:text-[#94A3B8] group-hover:text-[#1E293B] dark:group-hover:text-white transition-colors" />
           </div>
           <div>
-            <h4 className="font-extrabold text-theme-primary text-sm">Manage Recipients</h4>
-            <p className="text-[11px] text-theme-secondary">View recipient accounts</p>
+            <h4 className="font-semibold text-[#1E293B] dark:text-[#F1F5F9] text-sm">Manage Recipients</h4>
+            <p className="text-[11px] text-[#64748B] dark:text-[#94A3B8]">View recipient accounts</p>
           </div>
         </div>
 
         <div
           onClick={() => navigate('/admin/requests')}
-          className="bg-theme-card p-5 rounded-2xl border border-theme shadow-xs hover:shadow-md transition-all cursor-pointer group space-y-3"
+          className="bg-white dark:bg-[#181B21] p-5 rounded-xl border border-[#E2E8F0] dark:border-[#343B47] shadow-xs hover:border-[#A61B2B] dark:hover:border-rose-500 transition-all cursor-pointer group space-y-3"
         >
           <div className="flex items-center justify-between">
-            <div className="p-2.5 rounded-xl bg-amber-50 text-amber-600 group-hover:scale-105 transition-transform">
-              <FileText className="w-5 h-5" />
+            <div className="p-2 rounded-lg bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800/50">
+              <FileText className="w-4 h-4" />
             </div>
-            <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-amber-600 transition-colors" />
+            <ArrowRight className="w-4 h-4 text-[#64748B] dark:text-[#94A3B8] group-hover:text-[#1E293B] dark:group-hover:text-white transition-colors" />
           </div>
           <div>
-            <h4 className="font-extrabold text-theme-primary text-sm">Blood Requests</h4>
-            <p className="text-[11px] text-theme-secondary">Monitor active broadcasts</p>
+            <h4 className="font-semibold text-[#1E293B] dark:text-[#F1F5F9] text-sm">Blood Requests</h4>
+            <p className="text-[11px] text-[#64748B] dark:text-[#94A3B8]">Monitor active broadcasts</p>
           </div>
         </div>
 
         <div
           onClick={() => navigate('/admin/audit-logs')}
-          className="bg-theme-card p-5 rounded-2xl border border-theme shadow-xs hover:shadow-md transition-all cursor-pointer group space-y-3"
+          className="bg-white dark:bg-[#181B21] p-5 rounded-xl border border-[#E2E8F0] dark:border-[#343B47] shadow-xs hover:border-[#28734A] dark:hover:border-emerald-500 transition-all cursor-pointer group space-y-3"
         >
           <div className="flex items-center justify-between">
-            <div className="p-2.5 rounded-xl bg-theme-subtle text-theme-secondary group-hover:scale-105 transition-transform">
-              <Activity className="w-5 h-5" />
+            <div className="p-2 rounded-lg bg-[#F0FDF4] dark:bg-emerald-950/40 text-[#28734A] dark:text-emerald-400 border border-[#BBF7D0] dark:border-emerald-800/50">
+              <Activity className="w-4 h-4" />
             </div>
-            <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-theme-primary transition-colors" />
+            <ArrowRight className="w-4 h-4 text-[#64748B] dark:text-[#94A3B8] group-hover:text-[#1E293B] dark:group-hover:text-white transition-colors" />
           </div>
           <div>
-            <h4 className="font-extrabold text-theme-primary text-sm">Security Audit Logs</h4>
-            <p className="text-[11px] text-theme-secondary">System activity trail</p>
+            <h4 className="font-semibold text-[#1E293B] dark:text-[#F1F5F9] text-sm">Security Audit Logs</h4>
+            <p className="text-[11px] text-[#64748B] dark:text-[#94A3B8]">System activity trail</p>
           </div>
         </div>
       </div>
@@ -196,67 +193,67 @@ export default function AdminDashboardPage() {
       {/* 4. RECENT PLATFORM ACTIVITY TIMELINE & SECURITY STATUS */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Recent Activity Timeline (2 Cols) */}
-        <div className="lg:col-span-2 bg-theme-card p-6 sm:p-8 rounded-3xl border border-theme shadow-sm space-y-4">
-          <div className="flex items-center justify-between border-b border-theme pb-3">
-            <h3 className="text-base font-extrabold text-theme-primary tracking-tight flex items-center gap-2">
-              <Clock className="w-4 h-4 text-amber-500" /> Recent Platform Activity
+        <div className="lg:col-span-2 bg-white dark:bg-[#181B21] p-6 sm:p-7 rounded-xl border border-[#E2E8F0] dark:border-[#343B47] shadow-xs space-y-4 transition-colors">
+          <div className="flex items-center justify-between border-b border-[#E2E8F0] dark:border-[#343B47] pb-3">
+            <h3 className="text-base font-bold text-[#1E293B] dark:text-[#F1F5F9] tracking-tight flex items-center gap-2">
+              <Clock className="w-4 h-4 text-[#64748B] dark:text-[#94A3B8]" /> Recent Platform Activity
             </h3>
-            <span className="text-xs text-theme-muted">Live feed</span>
+            <span className="text-xs text-[#64748B] dark:text-[#94A3B8]">Live feed</span>
           </div>
 
-          <div className="space-y-3">
+          <div className="space-y-2.5">
             {recentLogs.length === 0 ? (
               <div className="p-6 text-center">
-                <Inbox className="w-8 h-8 text-slate-300 mx-auto mb-2" />
-                <p className="text-xs text-slate-500 font-semibold">No recent activity recorded yet.</p>
+                <Inbox className="w-6 h-6 text-slate-300 dark:text-zinc-600 mx-auto mb-2" />
+                <p className="text-xs text-[#64748B] dark:text-[#94A3B8] font-medium">No recent activity recorded yet.</p>
               </div>
             ) : recentLogs.map((act) => (
               <div
                 key={act.id}
-                className="p-3.5 bg-theme-surface rounded-2xl border border-theme text-xs flex items-center justify-between"
+                className="p-3 bg-[#F8FAFC] dark:bg-[#20242C] rounded-lg border border-[#E2E8F0] dark:border-[#343B47] text-xs flex items-center justify-between"
               >
                 <div className="space-y-0.5">
-                  <span className="font-bold text-theme-primary">{act.action}</span>
-                  <p className="text-[11px] text-theme-secondary">Initiated by {act.actorName || act.actor?.fullName || "System"}</p>
+                  <span className="font-semibold text-[#1E293B] dark:text-[#F1F5F9]">{act.action}</span>
+                  <p className="text-[11px] text-[#64748B] dark:text-[#94A3B8]">Initiated by {act.actorName || act.actor?.fullName || "System"}</p>
                 </div>
-                <span className="text-[10px] text-slate-400 shrink-0 font-medium">{new Date(act.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                <span className="text-[10px] text-[#64748B] dark:text-[#94A3B8] shrink-0 font-medium">{new Date(act.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
               </div>
             ))}
           </div>
         </div>
 
         {/* System Security Status Panel (1 Col) */}
-        <div className="bg-theme-card text-theme-primary p-6 sm:p-8 rounded-3xl border border-theme shadow-xl space-y-4">
-          <div className="flex items-center gap-2 border-b border-theme pb-3">
-            <ShieldCheck className="w-5 h-5 text-emerald-400" />
+        <div className="bg-white dark:bg-[#181B21] text-[#1E293B] dark:text-[#F1F5F9] p-6 sm:p-7 rounded-xl border border-[#E2E8F0] dark:border-[#343B47] shadow-xs space-y-4 transition-colors">
+          <div className="flex items-center gap-2 border-b border-[#E2E8F0] dark:border-[#343B47] pb-3">
+            <ShieldCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
             <h3 className="font-bold text-base">Security & Privacy Guard</h3>
           </div>
 
-          <div className="space-y-3 text-xs text-theme-secondary">
-            <div className="p-3 rounded-xl bg-theme-surface border border-theme space-y-1">
-              <div className="flex items-center gap-1.5 font-bold text-theme-primary">
-                <Lock className="w-3.5 h-3.5 text-emerald-400" /> Cookie Authentication
+          <div className="space-y-2.5 text-xs text-[#475569] dark:text-[#CBD5E1]">
+            <div className="p-3 rounded-lg bg-[#F8FAFC] dark:bg-[#20242C] border border-[#E2E8F0] dark:border-[#343B47] space-y-1">
+              <div className="flex items-center gap-1.5 font-semibold text-[#1E293B] dark:text-[#F1F5F9]">
+                <Lock className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" /> Cookie Authentication
               </div>
-              <p className="text-[11px] text-theme-muted">
-                JWT tokens stored in HttpOnly cookies (Zero localStorage exposure).
+              <p className="text-[11px] text-[#64748B] dark:text-[#94A3B8]">
+                JWT tokens stored in HttpOnly cookies with CSRF-safe configurations.
               </p>
             </div>
 
-            <div className="p-3 rounded-xl bg-theme-surface border border-theme space-y-1">
-              <div className="flex items-center gap-1.5 font-bold text-theme-primary">
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> Location Privacy
+            <div className="p-3 rounded-lg bg-[#F8FAFC] dark:bg-[#20242C] border border-[#E2E8F0] dark:border-[#343B47] space-y-1">
+              <div className="flex items-center gap-1.5 font-semibold text-[#1E293B] dark:text-[#F1F5F9]">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" /> Location Privacy
               </div>
-              <p className="text-[11px] text-theme-muted">
-                Donor exact residential addresses shielded from public search.
+              <p className="text-[11px] text-[#64748B] dark:text-[#94A3B8]">
+                Donor exact residential addresses shielded from public search results.
               </p>
             </div>
 
-            <div className="p-3 rounded-xl bg-theme-surface border border-theme space-y-1">
-              <div className="flex items-center gap-1.5 font-bold text-theme-primary">
-                <Activity className="w-3.5 h-3.5 text-amber-400" /> Audit Logging
+            <div className="p-3 rounded-lg bg-[#F8FAFC] dark:bg-[#20242C] border border-[#E2E8F0] dark:border-[#343B47] space-y-1">
+              <div className="flex items-center gap-1.5 font-semibold text-[#1E293B] dark:text-[#F1F5F9]">
+                <Activity className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" /> Audit Logging
               </div>
-              <p className="text-[11px] text-theme-muted">
-                All administrative actions recorded in security audit trail.
+              <p className="text-[11px] text-[#64748B] dark:text-[#94A3B8]">
+                All administrative state updates recorded in an immutable audit ledger.
               </p>
             </div>
           </div>

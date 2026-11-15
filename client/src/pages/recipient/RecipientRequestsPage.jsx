@@ -50,16 +50,22 @@ export default function RecipientRequestsPage() {
   }, [statusFilter]);
 
   useEffect(() => {
-    socketService.connect();
+    const handleReconnect = () => {
+      fetchRequests();
+    };
+
     socketService.on("bloodRequest:accepted", fetchRequests);
     socketService.on("bloodRequest:statusChanged", fetchRequests);
     socketService.on("bloodRequest:fulfilled", fetchRequests);
     socketService.on("bloodRequest:cancelled", fetchRequests);
+    window.addEventListener("bloodward:reconnect", handleReconnect);
+
     return () => {
       socketService.off("bloodRequest:accepted", fetchRequests);
       socketService.off("bloodRequest:statusChanged", fetchRequests);
       socketService.off("bloodRequest:fulfilled", fetchRequests);
       socketService.off("bloodRequest:cancelled", fetchRequests);
+      window.removeEventListener("bloodward:reconnect", handleReconnect);
     };
   }, []);
 
@@ -93,45 +99,45 @@ export default function RecipientRequestsPage() {
   return (
     <div className="space-y-6 pb-12">
       {/* Header */}
-      <div className="bg-theme-card p-6 sm:p-8 rounded-3xl border border-theme shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+      <div className="bg-white dark:bg-slate-900 p-6 sm:p-7 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4 transition-colors">
         <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <div className="p-2 rounded-xl bg-blue-600 text-white">
+          <div className="flex items-center gap-2.5">
+            <div className="p-2 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 border border-zinc-300 dark:border-zinc-700">
               <FileText className="w-5 h-5" />
             </div>
-            <h1 className="text-2xl font-extrabold text-theme-primary tracking-tight">
+            <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white tracking-tight">
               Manage & Track Blood Requests
             </h1>
           </div>
-          <p className="text-xs text-theme-muted">
-            View real-time donor responses, track request lifecycles, and access unlocked donor contacts
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            View real-time donor responses, track request lifecycles, and access unlocked donor contacts within your bounded radius
           </p>
         </div>
 
         <div className="flex items-center gap-2">
           <button
             onClick={handleRefresh}
-            className="p-2.5 rounded-xl bg-theme-card border border-theme text-theme-secondary hover:text-theme-primary hover:bg-theme-subtle cursor-pointer"
+            className="p-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-slate-800/60 cursor-pointer shadow-xs transition-colors"
             title="Refresh list"
           >
-            <RefreshCw className={`w-4 h-4 ${isLoading ? "animate-spin" : ""}`} />
+            <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? "animate-spin" : ""}`} />
           </button>
           <Button
             variant="primary"
             size="sm"
             onClick={() => navigate("/recipient/requests/create")}
-            className="font-bold shrink-0"
+            className="font-medium shrink-0"
           >
-            <PlusCircle className="w-4 h-4 mr-1" /> Create Request
+            <PlusCircle className="w-3.5 h-3.5 mr-1.5" /> Create Request
           </Button>
         </div>
       </div>
 
       {/* Error Notice */}
       {errorMsg && (
-        <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 text-xs font-semibold flex items-center justify-between">
+        <div className="p-3.5 rounded-lg bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800 text-rose-800 dark:text-rose-300 text-xs font-medium flex items-center justify-between">
           <span className="flex items-center gap-2">
-            <AlertTriangle className="w-4 h-4 text-rose-500" /> {errorMsg}
+            <AlertTriangle className="w-4 h-4 text-rose-600 dark:text-rose-400" /> {errorMsg}
           </span>
           <Button variant="outline" size="sm" onClick={fetchRequests}>
             Try Again
@@ -140,64 +146,64 @@ export default function RecipientRequestsPage() {
       )}
 
       {/* FILTER BAR */}
-      <div className="bg-theme-card p-4 sm:p-6 rounded-3xl border border-theme shadow-sm space-y-4">
+      <div className="bg-white dark:bg-slate-900 p-4 sm:p-5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs space-y-3.5 transition-colors">
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           {/* Search Input */}
           <div className="relative">
-            <Search className="w-4 h-4 text-theme-muted absolute left-3.5 top-3" />
+            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
             <input
               type="text"
               placeholder="Search reference # or hospital..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full text-xs rounded-xl border border-theme-input bg-theme-input text-theme-input placeholder-theme-muted pl-9 pr-3 py-2.5 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+              className="w-full text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 pl-9 pr-3 py-2 outline-none focus:border-zinc-950 focus:ring-1 focus:ring-zinc-950 dark:focus:border-zinc-200 dark:focus:ring-zinc-200"
             />
           </div>
 
           {/* Status Filter */}
-          <div className="flex items-center gap-1.5 bg-theme-subtle px-3 py-2 rounded-xl border border-theme text-xs">
-            <Filter className="w-3.5 h-3.5 text-theme-muted" />
-            <span className="text-theme-muted">Status:</span>
+          <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-800/60 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs">
+            <Filter className="w-3.5 h-3.5 text-slate-400" />
+            <span className="text-slate-500">Status:</span>
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="font-bold text-theme-primary bg-transparent outline-none cursor-pointer w-full"
+              className="font-medium text-slate-800 dark:text-slate-200 bg-transparent outline-none cursor-pointer w-full text-xs"
             >
-              <option value="ALL" className="bg-theme-card text-theme-primary">All Statuses</option>
-              <option value={REQUEST_STATUS.CREATED} className="bg-theme-card text-theme-primary">Created</option>
-              <option value={REQUEST_STATUS.ACTIVE} className="bg-theme-card text-theme-primary">Active Broadcast</option>
-              <option value={REQUEST_STATUS.DONOR_ACCEPTED} className="bg-theme-card text-theme-primary">Donor Accepted</option>
-              <option value={REQUEST_STATUS.IN_PROGRESS} className="bg-theme-card text-theme-primary">In Progress</option>
-              <option value={REQUEST_STATUS.FULFILLED} className="bg-theme-card text-theme-primary">Fulfilled</option>
-              <option value={REQUEST_STATUS.CANCELLED} className="bg-theme-card text-theme-primary">Cancelled</option>
+              <option value="ALL" className="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200">All Statuses</option>
+              <option value={REQUEST_STATUS.CREATED} className="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200">Created</option>
+              <option value={REQUEST_STATUS.ACTIVE} className="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200">Active Broadcast</option>
+              <option value={REQUEST_STATUS.DONOR_ACCEPTED} className="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200">Donor Accepted</option>
+              <option value={REQUEST_STATUS.IN_PROGRESS} className="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200">In Progress</option>
+              <option value={REQUEST_STATUS.FULFILLED} className="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200">Fulfilled</option>
+              <option value={REQUEST_STATUS.CANCELLED} className="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200">Cancelled</option>
             </select>
           </div>
 
           {/* Urgency Filter */}
-          <div className="flex items-center gap-1.5 bg-theme-subtle px-3 py-2 rounded-xl border border-theme text-xs">
-            <Filter className="w-3.5 h-3.5 text-theme-muted" />
-            <span className="text-theme-muted">Urgency:</span>
+          <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-800/60 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs">
+            <Filter className="w-3.5 h-3.5 text-slate-400" />
+            <span className="text-slate-500">Urgency:</span>
             <select
               value={urgencyFilter}
               onChange={(e) => setUrgencyFilter(e.target.value)}
-              className="font-bold text-theme-primary bg-transparent outline-none cursor-pointer w-full"
+              className="font-medium text-slate-800 dark:text-slate-200 bg-transparent outline-none cursor-pointer w-full text-xs"
             >
-              <option value="ALL" className="bg-theme-card text-theme-primary">All Levels</option>
-              <option value="Emergency" className="bg-theme-card text-theme-primary">Emergency Only</option>
-              <option value="High" className="bg-theme-card text-theme-primary">High Urgency</option>
-              <option value="Normal" className="bg-theme-card text-theme-primary">Normal</option>
+              <option value="ALL" className="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200">All Levels</option>
+              <option value="Emergency" className="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200">Emergency Only</option>
+              <option value="High" className="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200">High Urgency</option>
+              <option value="Normal" className="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200">Normal</option>
             </select>
           </div>
         </div>
 
         {(searchQuery || statusFilter !== "ALL" || urgencyFilter !== "ALL") && (
-          <div className="flex items-center justify-between text-xs pt-1 border-t border-theme">
-            <span className="text-theme-muted">
+          <div className="flex items-center justify-between text-xs pt-2 border-t border-slate-100 dark:border-slate-800">
+            <span className="text-slate-500">
               Showing {filteredRequests.length} matching requests
             </span>
             <button
               onClick={handleReset}
-              className="text-blue-600 dark:text-blue-400 font-semibold hover:underline cursor-pointer"
+              className="text-zinc-900 dark:text-zinc-100 font-semibold hover:underline cursor-pointer"
             >
               Clear Filters
             </button>
@@ -207,15 +213,17 @@ export default function RecipientRequestsPage() {
 
       {/* REQUEST CARDS LIST */}
       {isLoading ? (
-        <div className="bg-theme-card p-12 rounded-3xl border border-theme text-center space-y-3">
-          <RefreshCw className="w-8 h-8 text-blue-500 mx-auto animate-spin" />
-          <p className="text-xs font-semibold text-theme-muted">Loading your blood requests...</p>
+        <div className="bg-white dark:bg-slate-900 p-12 rounded-xl border border-slate-200 dark:border-slate-800 text-center space-y-3 shadow-xs">
+          <RefreshCw className="w-6 h-6 text-slate-400 mx-auto animate-spin" />
+          <p className="text-xs font-medium text-slate-500">Loading your blood requests...</p>
         </div>
       ) : filteredRequests.length === 0 ? (
-        <div className="bg-theme-card p-12 rounded-3xl border border-theme text-center space-y-3">
-          <Inbox className="w-10 h-10 text-theme-muted mx-auto" />
-          <h3 className="font-extrabold text-theme-primary text-base">No requests found</h3>
-          <p className="text-xs text-theme-muted max-w-md mx-auto">
+        <div className="bg-white dark:bg-slate-900 p-12 rounded-xl border border-slate-200 dark:border-slate-800 text-center space-y-3 shadow-xs">
+          <div className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400 flex items-center justify-center mx-auto">
+            <Inbox className="w-5 h-5" />
+          </div>
+          <h3 className="font-semibold text-slate-900 dark:text-white text-base">No requests found</h3>
+          <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto">
             You currently have no blood requests matching your filter parameters.
           </p>
           <Button variant="primary" size="sm" onClick={() => navigate("/recipient/requests/create")}>
@@ -223,7 +231,7 @@ export default function RecipientRequestsPage() {
           </Button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
           {filteredRequests.map((req) => {
             const targetReq = requests.find((r) => r.id === req.id) || req;
             return (

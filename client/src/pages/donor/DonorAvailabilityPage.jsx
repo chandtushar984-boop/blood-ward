@@ -30,8 +30,8 @@ export default function DonorAvailabilityPage() {
       updateUser({ availability: canonical });
       setFeedback(
         nextState
-          ? "Status updated to AVAILABLE. You are now active in emergency donor search."
-          : "Status updated to NOT AVAILABLE. Emergency alerts and search visibility paused."
+          ? "Status updated to Available. You are now active in emergency donor searches within 20 KM."
+          : "Status updated to Unavailable. Emergency alerts and search visibility paused."
       );
       setTimeout(() => setFeedback(null), 4000);
     } catch (err) {
@@ -44,17 +44,17 @@ export default function DonorAvailabilityPage() {
     <div className="max-w-4xl mx-auto space-y-6 pb-12">
       <Toast message={toastMessage} onClose={() => setToastMessage("")} />
       {/* Header */}
-      <div className="bg-theme-card p-6 sm:p-8 rounded-3xl border border-theme shadow-sm space-y-2">
-        <div className="flex items-center gap-2">
-          <div className="p-2 rounded-xl bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20">
-            <Power className="w-6 h-6" />
+      <div className="bg-white dark:bg-slate-900 p-6 sm:p-7 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs space-y-1 transition-colors">
+        <div className="flex items-center gap-2.5">
+          <div className="p-2 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 border border-zinc-300 dark:border-zinc-700">
+            <Power className="w-5 h-5" />
           </div>
           <div>
-            <h1 className="text-2xl font-extrabold text-theme-primary tracking-tight">
+            <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white tracking-tight">
               Donation Availability Control
             </h1>
-            <p className="text-xs text-theme-muted">
-              Control your visibility in emergency blood discovery and real-time alert dispatch
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Manage your visibility in emergency blood discovery and real-time alert dispatch within 20 KM
             </p>
           </div>
         </div>
@@ -63,21 +63,21 @@ export default function DonorAvailabilityPage() {
       {/* Instant Feedback Banner */}
       {feedback && (
         <div
-          className={`p-4 rounded-2xl text-xs font-semibold flex items-center justify-between shadow-xs transition-all ${
+          className={`p-3.5 rounded-lg text-xs font-medium flex items-center justify-between shadow-2xs transition-all ${
             isAvailable
-              ? "bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 dark:text-emerald-300"
-              : "bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-300"
+              ? "bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300"
+              : "bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-300"
           }`}
         >
           <span className="flex items-center gap-2">
             {isAvailable ? (
-              <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
             ) : (
-              <Info className="w-4 h-4 text-amber-500 shrink-0" />
+              <Info className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
             )}
             {feedback}
           </span>
-          <button onClick={() => setFeedback(null)} className="text-theme-muted hover:text-theme-primary cursor-pointer">
+          <button onClick={() => setFeedback(null)} className="text-slate-400 hover:text-slate-600 cursor-pointer">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -87,72 +87,72 @@ export default function DonorAvailabilityPage() {
       <DonorAvailabilityCard isAvailable={isAvailable} onToggle={handleToggle} />
 
       {/* Impact Explanation Section */}
-      <div className="bg-theme-card p-6 sm:p-8 rounded-3xl border border-theme shadow-sm space-y-6">
-        <h2 className="text-lg font-extrabold text-theme-primary tracking-tight border-b border-theme pb-3">
+      <div className="bg-white dark:bg-slate-900 p-6 sm:p-7 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs space-y-6 transition-colors">
+        <h2 className="text-base font-bold text-slate-900 dark:text-white tracking-tight border-b border-slate-100 dark:border-slate-800 pb-3">
           How Availability Status Works
         </h2>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* AVAILABLE MODE EFFECT */}
           <div
-            className={`p-5 rounded-2xl border transition-all ${
+            className={`p-4 rounded-lg border transition-all ${
               isAvailable
-                ? "bg-emerald-500/10 border-emerald-500/30 ring-1 ring-emerald-500/20"
-                : "bg-theme-card-elevated border-theme opacity-75"
+                ? "bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-900/60"
+                : "bg-slate-50 dark:bg-slate-800/40 border-slate-200 dark:border-slate-800 opacity-80"
             }`}
           >
             <div className="flex items-center justify-between mb-3">
-              <span className="font-extrabold text-sm text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
-                <CheckCircle2 className="w-4 h-4 text-emerald-500" /> AVAILABLE MODE
+              <span className="font-semibold text-xs text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600" /> AVAILABLE MODE
               </span>
-              <span className="text-[10px] font-bold uppercase bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 px-2 py-0.5 rounded">
+              <span className="text-[10px] font-semibold uppercase bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 px-2 py-0.5 rounded border border-emerald-200 dark:border-emerald-800">
                 Active
               </span>
             </div>
-            <ul className="space-y-2 text-xs text-theme-secondary">
+            <ul className="space-y-2 text-xs text-slate-600 dark:text-slate-300">
               <li className="flex items-start gap-2">
-                <Zap className="w-3.5 h-3.5 text-emerald-500 shrink-0 mt-0.5" />
-                <span>You appear in active donor search queries for blood group <strong>{user?.bloodGroup || "O+"}</strong>.</span>
+                <Zap className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
+                <span>You appear in active donor searches for blood group <strong className="text-slate-900 dark:text-white">{user?.bloodGroup || "O+"}</strong> within 20 KM.</span>
               </li>
               <li className="flex items-start gap-2">
-                <Bell className="w-3.5 h-3.5 text-emerald-500 shrink-0 mt-0.5" />
-                <span>You receive push notifications for emergency blood requests within your city/radius.</span>
+                <Bell className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
+                <span>You receive instant real-time alerts for emergency blood requests in your operational zone.</span>
               </li>
               <li className="flex items-start gap-2">
-                <ShieldCheck className="w-3.5 h-3.5 text-emerald-500 shrink-0 mt-0.5" />
-                <span>Only approximate distance is shown until you explicitly accept a request.</span>
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
+                <span>Your contact phone number remains strictly shielded until you voluntarily accept a request.</span>
               </li>
             </ul>
           </div>
 
           {/* NOT AVAILABLE MODE EFFECT */}
           <div
-            className={`p-5 rounded-2xl border transition-all ${
+            className={`p-4 rounded-lg border transition-all ${
               !isAvailable
-                ? "bg-theme-subtle border-theme ring-1 ring-theme"
-                : "bg-theme-card-elevated border-theme opacity-75"
+                ? "bg-slate-100/70 dark:bg-slate-800/60 border-slate-300 dark:border-slate-700"
+                : "bg-slate-50 dark:bg-slate-800/40 border-slate-200 dark:border-slate-800 opacity-80"
             }`}
           >
             <div className="flex items-center justify-between mb-3">
-              <span className="font-extrabold text-sm text-theme-primary flex items-center gap-1.5">
-                <XCircle className="w-4 h-4 text-theme-muted" /> NOT AVAILABLE MODE
+              <span className="font-semibold text-xs text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                <XCircle className="w-4 h-4 text-slate-400" /> UNAVAILABLE MODE
               </span>
-              <span className="text-[10px] font-bold uppercase bg-theme-subtle text-theme-muted px-2 py-0.5 rounded border border-theme">
+              <span className="text-[10px] font-semibold uppercase bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-400 px-2 py-0.5 rounded border border-slate-300 dark:border-slate-600">
                 Paused
               </span>
             </div>
-            <ul className="space-y-2 text-xs text-theme-muted">
+            <ul className="space-y-2 text-xs text-slate-500 dark:text-slate-400">
               <li className="flex items-start gap-2">
-                <X className="w-3.5 h-3.5 text-theme-muted shrink-0 mt-0.5" />
-                <span>Your profile is hidden from recipient donor searches.</span>
+                <X className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
+                <span>Your profile is hidden from recipient donor search queries.</span>
               </li>
               <li className="flex items-start gap-2">
-                <X className="w-3.5 h-3.5 text-theme-muted shrink-0 mt-0.5" />
-                <span>Emergency request notifications are temporarily paused.</span>
+                <X className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
+                <span>Emergency request broadcasts and notifications are temporarily paused.</span>
               </li>
               <li className="flex items-start gap-2">
-                <Info className="w-3.5 h-3.5 text-theme-muted shrink-0 mt-0.5" />
-                <span>Use this status when traveling, unwell, or temporarily unable to donate blood.</span>
+                <Info className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
+                <span>Toggle to this mode when traveling, recovering, or temporarily unavailable to donate.</span>
               </li>
             </ul>
           </div>

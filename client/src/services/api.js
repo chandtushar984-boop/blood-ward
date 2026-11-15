@@ -14,7 +14,14 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response && error.response.status === 401) {
-      // Clean handling for unauthenticated sessions
+      // For genuine protected API 401s (excluding initial session checks or login attempts),
+      // notify application context to transition smoothly to logged-out state
+      const requestUrl = error.config?.url || '';
+      if (!requestUrl.includes('/auth/me') && !requestUrl.includes('/auth/login')) {
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('bloodward:session-expired'));
+        }
+      }
     }
     return Promise.reject(error);
   }

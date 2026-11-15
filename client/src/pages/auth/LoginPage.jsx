@@ -9,6 +9,13 @@ import {
   HeartHandshake,
   Search,
   Activity,
+  ArrowRight,
+  Radar,
+  CheckCircle2,
+  AlertCircle,
+  Building2,
+  Terminal,
+  LockKeyhole,
 } from "lucide-react";
 import Input from "../../components/common/Input";
 import Toast from "../../components/common/Toast";
@@ -69,7 +76,6 @@ export default function LoginPage() {
       });
 
       const user = response.user || response;
-
       login(user);
 
       if (user.role === USER_ROLES.DONOR) {
@@ -83,7 +89,6 @@ export default function LoginPage() {
       }
     } catch (err) {
       console.error("Login Error:", err);
-
       setToastMessage(
         err.message || "Failed to sign in. Please verify your email and password."
       );
@@ -92,193 +97,277 @@ export default function LoginPage() {
     }
   };
 
+  const personaConfig = {
+    [USER_ROLES.DONOR]: {
+      tag: "VOLUNTARY DONOR",
+      title: "Voluntary Donor",
+      subtitle: "Emergency Dispatch & Proximity Acceptance",
+      description: "Receive real-time notifications for compatible requests within 5-50 KM, manage availability, and accept hospital requests.",
+      icon: HeartHandshake,
+      accentColor: "crimson",
+      activeBorder: "border-[#A61B2B]",
+      activeBg: "bg-[#FEF2F2]",
+      activeBadge: "bg-[#A61B2B] text-white",
+      iconColor: "text-[#A61B2B]",
+      placeholderEmail: "rahul.verma@example.in",
+      btnText: "Sign In as Voluntary Donor",
+    },
+    [USER_ROLES.RECIPIENT]: {
+      tag: "HOSPITAL RECIPIENT",
+      title: "Hospital / Recipient",
+      subtitle: "Requisitions & Discovery Radar",
+      description: "Issue hospital blood requests, discover compatible donors across distance presets, and track real-time dispatches.",
+      icon: Building2,
+      accentColor: "blue",
+      activeBorder: "border-[#315B83]",
+      activeBg: "bg-[#F0F7FF]",
+      activeBadge: "bg-[#315B83] text-white",
+      iconColor: "text-[#315B83]",
+      placeholderEmail: "priya.verma@example.in",
+      btnText: "Sign In as Recipient",
+    },
+    [USER_ROLES.ADMIN]: {
+      tag: "SYSTEM CONTROLLER",
+      title: "Administrator",
+      subtitle: "Audit Ledger & Governance",
+      description: "Audit security logs, govern verified accounts, and monitor systemic blood dispatch telemetry.",
+      icon: ShieldCheck,
+      accentColor: "navy",
+      activeBorder: "border-[#1E293B]",
+      activeBg: "bg-[#F1F5F9]",
+      activeBadge: "bg-[#1E293B] text-white",
+      iconColor: "text-[#1E293B]",
+      placeholderEmail: "admin@bloodward.com",
+      btnText: "Sign In as Administrator",
+    },
+  };
+
+  const activePersona = personaConfig[selectedRole];
+
   return (
-    <div className="max-w-5xl mx-auto py-8 px-4 sm:px-6">
+    <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center py-8 px-4 sm:px-6 lg:px-8">
       <Toast message={toastMessage} onClose={() => setToastMessage("")} />
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
 
-        {/* LEFT BRAND PANEL */}
-        <div className="lg:col-span-5 bg-slate-950 text-white p-8 sm:p-10 rounded-3xl border border-slate-800 shadow-2xl flex flex-col justify-between relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-64 h-64 bg-red-600/10 rounded-full blur-[80px] pointer-events-none" />
-
-          <div className="relative z-10 space-y-6">
-            <div className="space-y-2">
-              <div className="flex items-center gap-2.5">
-                <div className="w-10 h-10 rounded-xl bg-red-600 flex items-center justify-center text-white shadow-lg shadow-red-600/30">
-                  <Droplet className="w-6 h-6 fill-current" />
-                </div>
-                <div>
-                  <span className="text-xl font-extrabold tracking-tight">
-                    Blood<span className="text-red-500">Ward</span>
-                  </span>
-                  <span className="text-[10px] font-bold text-slate-400 tracking-widest uppercase block -mt-1">
-                    Emergency Network
-                  </span>
-                </div>
+      <div className="max-w-6xl w-full bg-white rounded-2xl border border-[#E2E8F0] shadow-sm overflow-hidden grid grid-cols-1 lg:grid-cols-12">
+        {/* LEFT COLUMN: HEALTHCARE PLATFORM TELEMETRY & SHOWCASE (5 cols) */}
+        <div className="lg:col-span-5 bg-[#F8FAFC] border-b lg:border-b-0 lg:border-r border-[#E2E8F0] p-6 sm:p-8 lg:p-10 flex flex-col justify-between space-y-8">
+          {/* Top Brand & Eyebrow */}
+          <div className="space-y-6">
+            <div className="space-y-3">
+              <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-md bg-[#FEF2F2] border border-[#FECACA] text-[#A61B2B] text-xs font-semibold tracking-wide uppercase">
+                <Droplet className="w-3.5 h-3.5 fill-current" />
+                <span>BLOODWARD CLINICAL DISPATCH</span>
               </div>
-              <p className="text-sm text-slate-300 leading-relaxed pt-2 font-light">
-                Rapid emergency blood matching platform connecting urgent recipients with nearby verified donors instantly.
+              <h2 className="text-2xl sm:text-3xl font-bold text-[#1E293B] tracking-tight leading-tight">
+                Rapid Transfusion Coordination. When Seconds Count.
+              </h2>
+              <p className="text-xs sm:text-sm text-[#475569] leading-relaxed">
+                Enterprise healthcare platform connecting emergency hospital requisitions with verified voluntary blood donors through privacy-safe proximity matching.
               </p>
             </div>
 
-            <div className="space-y-4 pt-4 border-t border-slate-800">
-              <div className="flex items-start gap-3">
-                <div className="p-2 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 shrink-0 mt-0.5">
-                  <Activity className="w-4 h-4" />
-                </div>
-                <div>
-                  <h4 className="text-xs font-bold text-white">Instant Emergency Match</h4>
-                  <p className="text-xs text-slate-400">Socket.io alerts notify available donors in radius instantly.</p>
-                </div>
+            {/* Clinical Telemetry Monitor */}
+            <div className="bg-white rounded-xl p-4 sm:p-5 border border-[#E2E8F0] shadow-2xs space-y-3 text-xs">
+              <div className="flex items-center justify-between pb-2 border-b border-[#E2E8F0] text-[11px] font-bold text-[#1E293B]">
+                <span className="flex items-center gap-1.5 text-[#315B83]">
+                  <Activity className="w-3.5 h-3.5 text-[#315B83]" />
+                  PLATFORM SPECIFICATION
+                </span>
+                <span className="text-[#28734A] flex items-center gap-1">
+                  <span className="w-2 h-2 rounded-full bg-[#28734A] animate-pulse" />
+                  OPERATIONAL
+                </span>
               </div>
 
-              <div className="flex items-start gap-3">
-                <div className="p-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 shrink-0 mt-0.5">
-                  <ShieldCheck className="w-4 h-4" />
+              <div className="space-y-2 text-[11px] text-[#475569]">
+                <div className="flex items-center justify-between">
+                  <span className="text-[#64748B]">Proximity Engine:</span>
+                  <span className="font-semibold text-[#1E293B]">Haversine Spherical</span>
                 </div>
-                <div>
-                  <h4 className="text-xs font-bold text-white">Privacy Protected</h4>
-                  <p className="text-xs text-slate-400">Donor contact details are shielded until a request is accepted.</p>
+                <div className="flex items-center justify-between">
+                  <span className="text-[#64748B]">Preset Horizons:</span>
+                  <span className="font-semibold text-[#A61B2B]">5 · 10 · 20 · 30 · 50 KM</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[#64748B]">Donor Privacy:</span>
+                  <span className="font-semibold text-[#28734A]">~500m Centroid Offset</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[#64748B]">Session Protection:</span>
+                  <span className="font-semibold text-[#315B83]">HttpOnly Cookie Auth</span>
                 </div>
               </div>
+            </div>
 
-              <div className="flex items-start gap-3">
-                <div className="p-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 shrink-0 mt-0.5">
-                  <HeartHandshake className="w-4 h-4" />
-                </div>
-                <div>
-                  <h4 className="text-xs font-bold text-white">Role-Based Workflows</h4>
-                  <p className="text-xs text-slate-400">Clear, tailored dashboards for Donors, Recipients, and Admins.</p>
-                </div>
+            {/* 3 Micro Metrics */}
+            <div className="grid grid-cols-3 gap-2 text-center">
+              <div className="bg-white p-2.5 rounded-lg border border-[#E2E8F0]">
+                <span className="block text-base font-bold text-[#A61B2B]">100%</span>
+                <span className="text-[10px] text-[#64748B] font-medium leading-tight block">RBC Matched</span>
+              </div>
+              <div className="bg-white p-2.5 rounded-lg border border-[#E2E8F0]">
+                <span className="block text-base font-bold text-[#315B83]">&lt;20ms</span>
+                <span className="text-[10px] text-[#64748B] font-medium leading-tight block">Socket Sync</span>
+              </div>
+              <div className="bg-white p-2.5 rounded-lg border border-[#E2E8F0]">
+                <span className="block text-base font-bold text-[#28734A]">Shielded</span>
+                <span className="text-[10px] text-[#64748B] font-medium leading-tight block">Gated Contacts</span>
               </div>
             </div>
           </div>
 
-          <div className="relative z-10 pt-6 mt-6 border-t border-slate-800/80 text-[11px] text-slate-400 flex items-center justify-between">
-            <span>Secure Authentication Portal</span>
-            <span className="text-emerald-400 font-semibold flex items-center gap-1">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" /> System Active
-            </span>
+          {/* Institutional Notice */}
+          <div className="pt-4 border-t border-[#E2E8F0] flex items-center justify-between text-[11px] text-[#64748B]">
+            <span>HEALTHCARE GOVERNANCE</span>
+            <span className="font-bold text-[#1E293B]">SEC-AUTH v2.4</span>
           </div>
         </div>
 
-        {/* RIGHT FORM PANEL */}
-        <div className="lg:col-span-7 bg-theme-card p-8 sm:p-10 rounded-3xl border border-theme shadow-xl flex flex-col justify-between transition-colors">
+        {/* RIGHT COLUMN: WORKSPACE SIGN-IN DESK (7 cols) */}
+        <div className="lg:col-span-7 bg-white p-6 sm:p-8 lg:p-10 flex flex-col justify-between space-y-6">
           <div className="space-y-6">
-            <div>
-              <h2 className="text-2xl font-bold text-theme-primary tracking-tight">
-                Welcome Back
-              </h2>
-              <p className="text-xs text-theme-muted mt-1">
-                {selectedRole === USER_ROLES.DONOR && "Sign in as Donor to manage availability and view blood requests."}
-                {selectedRole === USER_ROLES.RECIPIENT && "Sign in as Recipient to search donors and issue emergency requests."}
-                {selectedRole === USER_ROLES.ADMIN && "Sign in as Admin to manage users and inspect system audit logs."}
+            {/* Header */}
+            <div className="space-y-1">
+              <div className="text-[11px] font-semibold uppercase tracking-wider text-[#315B83] flex items-center gap-1.5">
+                <LockKeyhole className="w-3.5 h-3.5" />
+                SECURE WORKSPACE GATEWAY
+              </div>
+              <h1 className="text-2xl sm:text-3xl font-bold text-[#1E293B] tracking-tight">
+                Sign In to Your Workspace
+              </h1>
+              <p className="text-xs sm:text-sm text-[#475569]">
+                Select your clinical role persona to access your operational dashboard.
               </p>
             </div>
 
-            <div className="bg-theme-subtle p-1.5 rounded-2xl flex items-center gap-1.5 border border-theme">
-              <button
-                type="button"
-                onClick={() => setSelectedRole(USER_ROLES.DONOR)}
-                className={`flex-1 py-2 px-3 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer ${selectedRole === USER_ROLES.DONOR
-                    ? "bg-red-600 text-white shadow-md"
-                    : "text-theme-secondary hover:text-theme-primary hover:bg-theme-hover"
-                  }`}
-              >
-                <HeartHandshake className="w-3.5 h-3.5" />
-                Donor
-              </button>
+            {/* REIMAGINED ROLE PERSONA COMMAND DECK */}
+            <div className="space-y-2">
+              <label className="block text-xs font-semibold text-[#1E293B] uppercase tracking-wider">
+                Select Operational Persona:
+              </label>
 
-              <button
-                type="button"
-                onClick={() => setSelectedRole(USER_ROLES.RECIPIENT)}
-                className={`flex-1 py-2 px-3 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer ${selectedRole === USER_ROLES.RECIPIENT
-                    ? "bg-red-600 text-white shadow-md"
-                    : "text-theme-secondary hover:text-theme-primary hover:bg-theme-hover"
-                  }`}
-              >
-                <Search className="w-3.5 h-3.5" />
-                Recipient
-              </button>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                {Object.entries(personaConfig).map(([roleKey, cfg]) => {
+                  const isSelected = selectedRole === roleKey;
+                  const Icon = cfg.icon;
+                  return (
+                    <button
+                      key={roleKey}
+                      type="button"
+                      onClick={() => {
+                        setSelectedRole(roleKey);
+                        setToastMessage("");
+                      }}
+                      className={`p-3 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between space-y-2 ${
+                        isSelected
+                          ? `${cfg.activeBg} ${cfg.activeBorder} shadow-xs ring-1 ${cfg.activeBorder}`
+                          : "bg-white hover:bg-[#F8FAFC] border-[#E2E8F0] text-[#1E293B]"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between w-full">
+                        <Icon className={`w-4 h-4 ${isSelected ? cfg.iconColor : "text-[#64748B]"}`} />
+                        {isSelected && (
+                          <span className={`text-[9px] font-semibold uppercase px-1.5 py-0.5 rounded ${cfg.activeBadge}`}>
+                            Active
+                          </span>
+                        )}
+                      </div>
 
-              <button
-                type="button"
-                onClick={() => setSelectedRole(USER_ROLES.ADMIN)}
-                className={`flex-1 py-2 px-3 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer ${selectedRole === USER_ROLES.ADMIN
-                    ? "bg-slate-900 text-white shadow-md"
-                    : "text-theme-secondary hover:text-theme-primary hover:bg-theme-hover"
-                  }`}
-              >
-                <ShieldCheck className="w-3.5 h-3.5" />
-                Admin
-              </button>
+                      <div>
+                        <div className="text-xs font-bold text-[#1E293B] leading-tight">
+                          {cfg.title}
+                        </div>
+                        <div className="text-[10px] text-[#64748B] mt-0.5 leading-tight font-sans">
+                          {cfg.subtitle}
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
+            {/* FORM */}
+            <form onSubmit={handleSubmit} className="space-y-4 pt-1">
+              <div className="space-y-3.5">
+                <Input
+                  label="Email Identifier"
+                  id="email"
+                  type="email"
+                  placeholder={activePersona.placeholderEmail}
+                  value={formData.email}
+                  onChange={handleChange}
+                  error={errors.email}
+                  icon={Mail}
+                  required
+                />
 
-
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <Input
-                label="Email Address"
-                id="email"
-                type="email"
-                placeholder={
-                  selectedRole === USER_ROLES.DONOR
-                    ? "donor@example.com"
-                    : selectedRole === USER_ROLES.RECIPIENT
-                      ? "recipient@example.com"
-                      : "admin@bloodward.com"
-                }
-                value={formData.email}
-                onChange={handleChange}
-                error={errors.email}
-                icon={Mail}
-                required
-              />
-
-              <Input
-                label="Password"
-                id="password"
-                type="password"
-                placeholder="••••••••"
-                value={formData.password}
-                onChange={handleChange}
-                error={errors.password}
-                icon={Lock}
-                required
-              />
+                <Input
+                  label="Password"
+                  id="password"
+                  type="password"
+                  placeholder="••••••••••••"
+                  value={formData.password}
+                  onChange={handleChange}
+                  error={errors.password}
+                  icon={Lock}
+                  required
+                />
+              </div>
 
               <Button
                 type="submit"
-                variant={selectedRole === USER_ROLES.ADMIN ? "secondary" : "primary"}
-                className="w-full py-3 mt-2 shadow-md font-bold"
+                variant={selectedRole === USER_ROLES.DONOR ? "primary" : selectedRole === USER_ROLES.RECIPIENT ? "secondary" : "navy"}
+                className="w-full py-2.5 mt-2 font-semibold text-xs flex items-center justify-center gap-2 cursor-pointer shadow-xs"
                 isLoading={isLoading}
               >
-                <LogIn className="w-4 h-4 mr-1.5" />
-                Sign In as {selectedRole === USER_ROLES.DONOR ? "Donor" : selectedRole === USER_ROLES.RECIPIENT ? "Recipient" : "Admin"}
+                <LogIn className="w-3.5 h-3.5" />
+                <span>{activePersona.btnText} →</span>
               </Button>
             </form>
           </div>
 
-          <div className="pt-6 mt-6 border-t border-theme text-center space-y-2 text-xs">
-            <p className="text-theme-muted">Need a new BloodWard account?</p>
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+          {/* DUAL REGISTRATION ONBOARDING GATEWAYS */}
+          <div className="pt-5 border-t border-[#E2E8F0] space-y-3">
+            <div className="text-xs font-semibold text-[#64748B] uppercase tracking-wider">
+              Need a new verified account?
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <Link
                 to="/register/donor"
-                className="text-red-600 dark:text-red-400 font-bold hover:underline inline-flex items-center gap-1"
+                className="p-3 rounded-xl border border-[#E2E8F0] hover:border-[#A61B2B] bg-[#F8FAFC] hover:bg-[#FEF2F2] transition-all flex items-center justify-between group"
               >
-                Register as Donor
+                <div>
+                  <div className="text-xs font-bold text-[#1E293B] group-hover:text-[#A61B2B] flex items-center gap-1.5 transition-colors">
+                    <HeartHandshake className="w-3.5 h-3.5 text-[#A61B2B]" />
+                    Register as Donor
+                  </div>
+                  <div className="text-[11px] text-[#64748B] mt-0.5">
+                    Join voluntary donor registry
+                  </div>
+                </div>
+                <ArrowRight className="w-4 h-4 text-[#94A3B8] group-hover:text-[#A61B2B] group-hover:translate-x-0.5 transition-all" />
               </Link>
-              <span className="hidden sm:inline text-theme-muted">•</span>
+
               <Link
                 to="/register/recipient"
-                className="text-theme-primary font-bold hover:underline inline-flex items-center gap-1"
+                className="p-3 rounded-xl border border-[#E2E8F0] hover:border-[#315B83] bg-[#F8FAFC] hover:bg-[#F0F7FF] transition-all flex items-center justify-between group"
               >
-                Register as Recipient
+                <div>
+                  <div className="text-xs font-bold text-[#1E293B] group-hover:text-[#315B83] flex items-center gap-1.5 transition-colors">
+                    <Building2 className="w-3.5 h-3.5 text-[#315B83]" />
+                    Register as Recipient
+                  </div>
+                  <div className="text-[11px] text-[#64748B] mt-0.5">
+                    Issue hospital requisitions
+                  </div>
+                </div>
+                <ArrowRight className="w-4 h-4 text-[#94A3B8] group-hover:text-[#315B83] group-hover:translate-x-0.5 transition-all" />
               </Link>
             </div>
           </div>
         </div>
-
       </div>
     </div>
   );

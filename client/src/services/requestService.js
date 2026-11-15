@@ -51,7 +51,9 @@ export const requestService = {
       const response = await api.patch("/requests/" + id + "/accept");
       return response.data;
     } catch (error) {
-      throw error.response?.data || { message: "Failed to accept request" };
+      const data = error.response?.data || { message: "Failed to accept request" };
+      if (error.response?.status) data.statusCode = error.response.status;
+      throw data;
     }
   },
 
@@ -60,7 +62,9 @@ export const requestService = {
       const response = await api.patch("/requests/" + id + "/reject");
       return response.data;
     } catch (error) {
-      throw error.response?.data || { message: "Failed to decline request" };
+      const data = error.response?.data || { message: "Failed to decline request" };
+      if (error.response?.status) data.statusCode = error.response.status;
+      throw data;
     }
   },
 
@@ -88,6 +92,15 @@ export const requestService = {
       return response.data;
     } catch (error) {
       throw error.response?.data || { message: "Failed to cancel request" };
+    }
+  },
+
+  async expandRadius(id, newRadiusKm) {
+    try {
+      const response = await api.patch("/requests/" + id + "/expand-radius", { newRadiusKm });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: "Failed to expand request radius" };
     }
   },
 };

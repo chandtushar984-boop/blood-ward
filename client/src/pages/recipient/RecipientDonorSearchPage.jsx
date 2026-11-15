@@ -1,20 +1,20 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
+import { socketService } from "../../services/socketService";
 import {
   Search,
-  Filter,
   MapPin,
   RefreshCw,
   Inbox,
   ArrowUpDown,
   CheckCircle2,
-  ShieldCheck,
   Map as MapIcon,
   LayoutGrid,
+  Columns,
   AlertCircle,
+  Radio,
 } from "lucide-react";
-import BloodGroupBadge from "../../components/common/BloodGroupBadge";
 import Button from "../../components/common/Button";
 import RecipientDonorCard from "../../components/recipient/RecipientDonorCard";
 import RecipientDonorDetailModal from "../../components/recipient/RecipientDonorDetailModal";
@@ -33,7 +33,7 @@ export default function RecipientDonorSearchPage() {
   const [distanceRadius, setDistanceRadius] = useState(20);
   const [availableOnly, setAvailableOnly] = useState(true);
   const [sortBy, setSortBy] = useState("NEAREST");
-  const [viewMode, setViewMode] = useState("GRID");
+  const [viewMode, setViewMode] = useState("SPLIT"); // GRID | MAP | SPLIT
   const [selectedDonorForModal, setSelectedDonorForModal] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [searchError, setSearchError] = useState(null);
@@ -41,7 +41,7 @@ export default function RecipientDonorSearchPage() {
   const recipientLocation = getCityCoordinates(user?.state, user?.city);
   const hasProfileLocation = !!(user?.city && recipientLocation);
 
-  const fetchDonors = async () => {
+  const fetchDonors = useCallback(async () => {
     if (distanceRadius !== "any" && !hasProfileLocation) {
       setDonors([]);
       setSearchError(null);
@@ -90,17 +90,57 @@ export default function RecipientDonorSearchPage() {
       }
     } catch (err) {
       console.error("Donor search API failed:", err);
-      const message = err.response?.data?.message || err.message || "Search request failed. Please try again.";
+      const message =
+        err.response?.data?.message || err.message || "Search request failed. Please try again.";
       setSearchError(message);
       setDonors([]);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [distanceRadius, hasProfileLocation, recipientLocation, selectedBloodGroup, sortBy]);
 
   useEffect(() => {
     fetchDonors();
-  }, [selectedBloodGroup, distanceRadius, sortBy, user?.state, user?.city]);
+  }, [fetchDonors]);
+
+  // Real-Time Socket.IO Synchronization for Donor Availability
+  useEffect(() => {
+    const handleDonorAvailability = (payload) => {
+      const donorId = payload?.donorId || payload?.id;
+      if (!donorId) return;
+
+      const newIsAvailable =
+        payload.isAvailable !== undefined
+          ? payload.isAvailable
+          : payload.availability === "available";
+
+      setDonors((prev) =>
+        prev.map((d) =>
+          d.id === donorId
+            ? {
+                ...d,
+                isAvailable: newIsAvailable,
+                availability: payload.availability || (newIsAvailable ? "available" : "not_available"),
+              }
+            : d
+        )
+      );
+    };
+
+    const handleReconnect = () => {
+      fetchDonors();
+    };
+
+    socketService.on("donor:availabilityChanged", handleDonorAvailability);
+    socketService.on("donor:availability_updated", handleDonorAvailability);
+    window.addEventListener("bloodward:reconnect", handleReconnect);
+
+    return () => {
+      socketService.off("donor:availabilityChanged", handleDonorAvailability);
+      socketService.off("donor:availability_updated", handleDonorAvailability);
+      window.removeEventListener("bloodward:reconnect", handleReconnect);
+    };
+  }, [fetchDonors]);
 
   const handleReset = () => {
     setSelectedBloodGroup("ALL");
@@ -129,65 +169,84 @@ export default function RecipientDonorSearchPage() {
   return (
     <div className="space-y-6 pb-12">
       {/* Top Header */}
-      <div className="bg-theme-card p-6 sm:p-8 rounded-3xl border border-theme shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="bg-white p-6 sm:p-7 rounded-xl border border-zinc-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="space-y-1">
-          <h1 className="text-2xl font-extrabold text-theme-primary tracking-tight flex items-center gap-2">
-            <Search className="w-7 h-7 text-blue-500" /> Find Nearby Blood Donors
+          <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded bg-zinc-100 text-zinc-800 text-[11px] uppercase font-semibold">
+            <Radio className="w-3 h-3 text-zinc-950 animate-pulse" />
+            RECIPIENT DISCOVERY RADAR
+          </div>
+          <h1 className="text-xl sm:text-2xl font-bold text-zinc-950 tracking-tight flex items-center gap-2">
+            Discover Nearby Blood Donors
           </h1>
-          <p className="text-xs text-theme-muted">
-            Search voluntary blood donors by blood group, radius distance, and active availability
+          <p className="text-xs text-zinc-600">
+            Real-time directory of verified voluntary blood donors bounded by canonical distance presets
           </p>
         </div>
 
         <div className="flex items-center gap-2">
           {/* View Toggle */}
-          <div className="bg-theme-subtle p-1 rounded-xl flex items-center border border-theme">
+          <div className="bg-zinc-100 p-1 rounded-lg flex items-center border border-zinc-200">
             <button
-              onClick={() => setViewMode("GRID")}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
-                viewMode === "GRID"
-                  ? "bg-theme-card text-theme-primary shadow-xs"
-                  : "text-theme-muted hover:text-theme-primary"
+              type="button"
+              onClick={() => setViewMode("SPLIT")}
+              className={`hidden md:flex px-2.5 py-1.5 rounded-md text-xs font-medium transition-all items-center gap-1.5 cursor-pointer ${
+                viewMode === "SPLIT"
+                  ? "bg-white text-zinc-950 shadow-2xs font-bold border border-zinc-200"
+                  : "text-zinc-600 hover:text-zinc-950"
               }`}
             >
-              <LayoutGrid className="w-3.5 h-3.5" /> Grid View
+              <Columns className="w-3.5 h-3.5" /> Split
             </button>
             <button
+              type="button"
               onClick={() => setViewMode("MAP")}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
+              className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition-all flex items-center gap-1.5 cursor-pointer ${
                 viewMode === "MAP"
-                  ? "bg-theme-card text-theme-primary shadow-xs"
-                  : "text-theme-muted hover:text-theme-primary"
+                  ? "bg-white text-zinc-950 shadow-2xs font-bold border border-zinc-200"
+                  : "text-zinc-600 hover:text-zinc-950"
               }`}
             >
-              <MapIcon className="w-3.5 h-3.5" /> Map View
+              <MapIcon className="w-3.5 h-3.5" /> Map
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode("GRID")}
+              className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition-all flex items-center gap-1.5 cursor-pointer ${
+                viewMode === "GRID"
+                  ? "bg-white text-zinc-950 shadow-2xs font-bold border border-zinc-200"
+                  : "text-zinc-600 hover:text-zinc-950"
+              }`}
+            >
+              <LayoutGrid className="w-3.5 h-3.5" /> Grid
             </button>
           </div>
 
           <button
+            type="button"
             onClick={handleRefresh}
-            className="p-2.5 rounded-xl bg-theme-card border border-theme text-theme-secondary hover:text-theme-primary hover:bg-theme-subtle cursor-pointer"
+            className="p-2 rounded-lg bg-white border border-zinc-200 text-zinc-700 hover:text-zinc-950 hover:bg-zinc-50 cursor-pointer shadow-xs transition-colors"
             title="Refresh search"
           >
-            <RefreshCw className={`w-4 h-4 ${isLoading ? "animate-spin" : ""}`} />
+            <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? "animate-spin" : ""}`} />
           </button>
         </div>
       </div>
 
       {/* SEARCH CONTROL BAR */}
-      <div className="bg-theme-card p-4 sm:p-6 rounded-3xl border border-theme shadow-sm space-y-4">
+      <div className="bg-white p-4 sm:p-5 rounded-xl border border-zinc-200 shadow-xs space-y-4">
         {/* Blood Group Filter Chips */}
-        <div className="space-y-2">
-          <label className="text-xs font-bold text-theme-secondary uppercase tracking-wider block">
-            Select Blood Group Filter:
+        <div className="space-y-1.5">
+          <label className="text-xs font-semibold text-zinc-800 uppercase tracking-wider block">
+            Filter by Blood Group:
           </label>
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-1.5">
             <button
+              type="button"
               onClick={() => setSelectedBloodGroup("ALL")}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
+              className={`px-3 py-1 rounded-md text-xs font-semibold transition-all cursor-pointer ${
                 selectedBloodGroup === "ALL"
-                  ? "bg-blue-600 text-white shadow-md"
-                  : "bg-theme-subtle text-theme-secondary hover:bg-theme-hover border border-theme"
+                  ? "bg-zinc-950 text-white"
+                  : "bg-zinc-100 text-zinc-700 hover:bg-zinc-200 border border-zinc-200"
               }`}
             >
               All Blood Groups
@@ -195,88 +254,91 @@ export default function RecipientDonorSearchPage() {
             {BLOOD_GROUPS.map((bg) => (
               <button
                 key={bg}
+                type="button"
                 onClick={() => setSelectedBloodGroup(bg)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
+                className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-all cursor-pointer ${
                   selectedBloodGroup === bg
-                    ? "bg-red-600 text-white shadow-md"
-                    : "bg-theme-subtle text-theme-secondary hover:bg-theme-hover border border-theme"
+                    ? "bg-zinc-950 text-white"
+                    : "bg-zinc-100 text-zinc-700 hover:bg-zinc-200 border border-zinc-200"
                 }`}
               >
-                🩸 {bg}
+                {bg}
               </button>
             ))}
           </div>
         </div>
 
         {/* Input Controls Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-1">
           {/* Search Input */}
           <div className="relative">
-            <Search className="w-4 h-4 text-theme-muted absolute left-3.5 top-3" />
+            <Search className="w-4 h-4 text-zinc-400 absolute left-3 top-2.5" />
             <input
               type="text"
               placeholder="Filter by name or city..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full text-xs rounded-xl border border-theme-input bg-theme-input text-theme-input placeholder-theme-muted pl-9 pr-3 py-2.5 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+              className="w-full text-xs rounded-lg border border-zinc-200 bg-white text-zinc-950 placeholder-zinc-400 pl-9 pr-3 py-2 outline-none focus:border-zinc-950 focus:ring-1 focus:ring-zinc-950 font-sans"
             />
           </div>
 
-          {/* Distance Radius */}
-          <div className="flex items-center gap-1.5 bg-theme-subtle px-3 py-2 rounded-xl border border-theme text-xs">
-            <MapPin className="w-3.5 h-3.5 text-theme-muted" />
-            <span className="text-theme-muted">Radius:</span>
+          {/* Canonical Distance Presets strictly: [5, 10, 20, 30, 50] */}
+          <div className="flex items-center gap-2 bg-zinc-50 px-3 py-1.5 rounded-lg border border-zinc-200 text-xs">
+            <MapPin className="w-3.5 h-3.5 text-zinc-400" />
+            <span className="text-zinc-500">Radius:</span>
             <select
               value={distanceRadius}
               onChange={(e) => setDistanceRadius(e.target.value === "any" ? "any" : Number(e.target.value))}
-              className="font-bold text-theme-primary bg-transparent outline-none cursor-pointer w-full"
+              className="font-bold text-zinc-950 bg-transparent outline-none cursor-pointer w-full text-xs"
             >
-              <option value={2} className="bg-theme-card text-theme-primary">Within 2 km</option>
-              <option value={5} className="bg-theme-card text-theme-primary">Within 5 km</option>
-              <option value={10} className="bg-theme-card text-theme-primary">Within 10 km</option>
-              <option value={20} className="bg-theme-card text-theme-primary">Within 20 km</option>
-              <option value="any" className="bg-theme-card text-theme-primary">Any distance (All cities)</option>
+              <option value={5}>Within 5 KM</option>
+              <option value={10}>Within 10 KM</option>
+              <option value={20}>Within 20 KM</option>
+              <option value={30}>Within 30 KM</option>
+              <option value={50}>Within 50 KM (Max Cap)</option>
+              <option value="any">Any distance</option>
             </select>
           </div>
 
           {/* Sort By */}
-          <div className="flex items-center gap-1.5 bg-theme-subtle px-3 py-2 rounded-xl border border-theme text-xs">
-            <ArrowUpDown className="w-3.5 h-3.5 text-theme-muted" />
-            <span className="text-theme-muted">Sort:</span>
+          <div className="flex items-center gap-2 bg-zinc-50 px-3 py-1.5 rounded-lg border border-zinc-200 text-xs">
+            <ArrowUpDown className="w-3.5 h-3.5 text-zinc-400" />
+            <span className="text-zinc-500">Sort:</span>
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value)}
-              className="font-bold text-theme-primary bg-transparent outline-none cursor-pointer w-full"
+              className="font-medium text-zinc-900 bg-transparent outline-none cursor-pointer w-full text-xs"
             >
-              <option value="NEAREST" className="bg-theme-card text-theme-primary">Nearest Proximity</option>
-              <option value="FARTHEST" className="bg-theme-card text-theme-primary">Farthest First</option>
-              <option value="RECENT" className="bg-theme-card text-theme-primary">Recently Active</option>
+              <option value="NEAREST">Nearest Proximity</option>
+              <option value="FARTHEST">Farthest First</option>
+              <option value="RECENT">Recently Active</option>
             </select>
           </div>
 
           {/* Available Only Checkbox */}
-          <label className="flex items-center justify-between bg-theme-subtle px-3.5 py-2 rounded-xl border border-theme text-xs font-semibold text-theme-primary cursor-pointer">
+          <label className="flex items-center justify-between bg-zinc-50 px-3 py-1.5 rounded-lg border border-zinc-200 text-xs font-medium text-zinc-800 cursor-pointer">
             <span className="flex items-center gap-1.5">
-              <CheckCircle2 className="w-4 h-4 text-emerald-500" /> Available Only
+              <CheckCircle2 className="w-3.5 h-3.5 text-zinc-950" /> Available Only
             </span>
             <input
               type="checkbox"
               checked={availableOnly}
               onChange={(e) => setAvailableOnly(e.target.checked)}
-              className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer"
+              className="rounded text-zinc-950 focus:ring-zinc-950 w-3.5 h-3.5 cursor-pointer"
             />
           </label>
         </div>
 
         {/* Applied Filters Reset Bar */}
         {(selectedBloodGroup !== "ALL" || searchQuery || distanceRadius !== 20 || !availableOnly || sortBy !== "NEAREST") && (
-          <div className="flex items-center justify-between text-xs pt-1 border-t border-theme">
-            <span className="text-theme-muted">
+          <div className="flex items-center justify-between text-xs pt-2 border-t border-zinc-100">
+            <span className="text-zinc-500">
               Showing {filteredDonors.length} matching donors
             </span>
             <button
+              type="button"
               onClick={handleReset}
-              className="text-blue-600 dark:text-blue-400 font-semibold hover:underline cursor-pointer"
+              className="text-zinc-950 font-bold hover:underline cursor-pointer"
             >
               Reset Filters
             </button>
@@ -286,12 +348,14 @@ export default function RecipientDonorSearchPage() {
 
       {/* Location Required Banner */}
       {!hasProfileLocation && distanceRadius !== "any" && (
-        <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-300 text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
+        <div className="p-4 rounded-xl bg-zinc-100 border border-zinc-300 text-zinc-900 text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
           <div className="flex items-center gap-2">
-            <AlertCircle className="w-5 h-5 text-amber-500 shrink-0" />
+            <AlertCircle className="w-5 h-5 text-zinc-800 shrink-0" />
             <div>
-              <span className="font-bold block text-theme-primary">Location Coordinates Required for Radius Search</span>
-              <span className="text-theme-muted">
+              <span className="font-bold block text-zinc-950">
+                Location Coordinates Required for Radius Search
+              </span>
+              <span className="text-zinc-600">
                 Your recipient profile does not have a recognized state/city set. Set your profile location or switch to "Any distance".
               </span>
             </div>
@@ -309,9 +373,9 @@ export default function RecipientDonorSearchPage() {
 
       {/* Search Error Banner */}
       {searchError && (
-        <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 text-xs flex items-center justify-between">
-          <span className="flex items-center gap-2 font-semibold">
-            <AlertCircle className="w-4 h-4 text-rose-500" /> {searchError}
+        <div className="p-3.5 rounded-lg bg-zinc-100 border border-zinc-300 text-zinc-950 text-xs flex items-center justify-between">
+          <span className="flex items-center gap-2 font-medium">
+            <AlertCircle className="w-4 h-4 text-zinc-950" /> {searchError}
           </span>
           <Button variant="outline" size="sm" onClick={fetchDonors}>
             Try Again
@@ -319,34 +383,66 @@ export default function RecipientDonorSearchPage() {
         </div>
       )}
 
-      {/* VIEW MODES */}
-      {viewMode === "MAP" ? (
+      {/* VIEW MODES: MAP, GRID, OR SPLIT */}
+      {isLoading ? (
+        <div className="bg-white p-12 rounded-xl border border-zinc-200 text-center space-y-3 shadow-xs">
+          <RefreshCw className="w-6 h-6 text-zinc-400 mx-auto animate-spin" />
+          <p className="text-xs text-zinc-600">Searching nearby verified donors...</p>
+        </div>
+      ) : filteredDonors.length === 0 ? (
+        <div className="bg-white p-12 rounded-xl border border-zinc-200 text-center space-y-3 shadow-xs">
+          <div className="w-10 h-10 rounded-full bg-zinc-100 text-zinc-400 flex items-center justify-center mx-auto">
+            <Inbox className="w-5 h-5" />
+          </div>
+          <h3 className="font-bold text-zinc-950 text-base">No matching donors found</h3>
+          <p className="text-xs text-zinc-600 max-w-md mx-auto">
+            Try expanding your search radius to 30 KM or 50 KM, selecting all blood groups, or toggling "Any distance".
+          </p>
+          <Button variant="outline" size="sm" onClick={handleReset}>
+            Reset Search Filters
+          </Button>
+        </div>
+      ) : viewMode === "MAP" ? (
+        /* MAP ONLY VIEW */
         <div className="space-y-3">
           <DonorSearchMap
             donors={filteredDonors}
             radiusKm={distanceRadius === "any" ? 9999 : distanceRadius}
             onSelectDonor={(d) => setSelectedDonorForModal(d)}
             center={recipientLocation ? [recipientLocation.lat, recipientLocation.lng] : [28.6139, 77.2090]}
+            onRadiusChange={(r) => setDistanceRadius(r)}
           />
         </div>
-      ) : isLoading ? (
-        <div className="bg-theme-card p-12 rounded-3xl border border-theme text-center space-y-3">
-          <RefreshCw className="w-8 h-8 text-blue-500 mx-auto animate-spin" />
-          <p className="text-xs font-semibold text-theme-muted">Searching nearby donors...</p>
-        </div>
-      ) : filteredDonors.length === 0 ? (
-        <div className="bg-theme-card p-12 rounded-3xl border border-theme text-center space-y-3">
-          <Inbox className="w-10 h-10 text-theme-muted mx-auto" />
-          <h3 className="font-extrabold text-theme-primary text-base">No matching donors found</h3>
-          <p className="text-xs text-theme-muted max-w-md mx-auto">
-            Try expanding your search radius, selecting all blood groups, or checking "Any distance".
-          </p>
-          <Button variant="outline" size="sm" onClick={handleReset}>
-            Reset Search Filters
-          </Button>
+      ) : viewMode === "SPLIT" ? (
+        /* SPLIT SCREEN VIEW */
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+          <div className="lg:col-span-7 sticky top-4">
+            <DonorSearchMap
+              donors={filteredDonors}
+              radiusKm={distanceRadius === "any" ? 9999 : distanceRadius}
+              onSelectDonor={(d) => setSelectedDonorForModal(d)}
+              center={recipientLocation ? [recipientLocation.lat, recipientLocation.lng] : [28.6139, 77.2090]}
+              onRadiusChange={(r) => setDistanceRadius(r)}
+            />
+          </div>
+
+          <div className="lg:col-span-5 space-y-3.5 max-h-[580px] overflow-y-auto pr-1">
+            <div className="text-xs font-mono font-semibold text-zinc-500 uppercase tracking-wider flex items-center justify-between pb-1 border-b border-zinc-200">
+              <span>Matching Donors ({filteredDonors.length})</span>
+              <span>Radius: {distanceRadius === "any" ? "Any" : `${distanceRadius} KM`}</span>
+            </div>
+            {filteredDonors.map((donor) => (
+              <RecipientDonorCard
+                key={donor.id}
+                donor={donor}
+                onViewDetails={(d) => setSelectedDonorForModal(d)}
+              />
+            ))}
+          </div>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        /* GRID ONLY VIEW */
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
           {filteredDonors.map((donor) => (
             <RecipientDonorCard
               key={donor.id}
