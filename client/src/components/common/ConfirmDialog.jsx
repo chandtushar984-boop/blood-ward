@@ -16,27 +16,28 @@ export default function ConfirmDialog({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-in fade-in duration-200">
-      <div className="bg-theme-modal max-w-md w-full rounded-3xl border border-theme shadow-2xl overflow-hidden space-y-0">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in duration-150">
+      <div className="bg-theme-modal max-w-md w-full rounded-xl border border-theme shadow-xl overflow-hidden space-y-0">
         {/* Header */}
-        <div className="p-5 bg-theme-modal-header text-theme-primary flex items-center justify-between border-b border-theme">
+        <div className="p-4 bg-theme-modal-header text-theme-primary flex items-center justify-between border-b border-theme">
           <div className="flex items-center gap-2">
-            <AlertTriangle className="w-5 h-5 text-amber-500" />
-            <h3 className="font-extrabold text-base text-theme-primary">{title}</h3>
+            <AlertTriangle className="w-4 h-4 text-zinc-950 dark:text-zinc-100" />
+            <h3 className="font-semibold text-sm text-theme-primary">{title}</h3>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg bg-theme-subtle hover:bg-theme-hover text-theme-secondary hover:text-theme-primary cursor-pointer"
+            className="p-1 rounded-md bg-theme-subtle hover:bg-theme-hover text-theme-secondary hover:text-theme-primary cursor-pointer transition-colors"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Body */}
-        <div className="p-6 space-y-3">
+        <div className="p-5 space-y-3">
           <p className="text-xs text-theme-secondary leading-relaxed">{message}</p>
-          <div className="p-3 bg-rose-500/10 border border-rose-500/20 rounded-xl text-[11px] text-rose-600 dark:text-rose-400 font-medium">
-            ⚠️ Administrative Audit Notice: This action will be logged in the system security audit trail.
+          <div className="p-2.5 bg-theme-subtle border border-theme rounded-lg text-[11px] text-theme-muted font-medium flex items-center gap-2">
+            <span className="w-1.5 h-1.5 rounded-full bg-zinc-950 dark:bg-zinc-100 shrink-0" />
+            <span>Administrative Audit Notice: This action is recorded in the security audit log.</span>
           </div>
         </div>
 

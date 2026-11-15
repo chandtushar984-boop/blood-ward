@@ -1,32 +1,66 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Link, Outlet, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { useNotification } from "../context/NotificationContext";
 import {
   Droplet,
   LayoutDashboard,
   User,
   History,
-  Power,
+  LogOut,
   CheckCircle2,
   XCircle,
+  Bell,
+  Menu,
+  X,
 } from "lucide-react";
 import BloodGroupBadge from "../components/common/BloodGroupBadge";
 import ThemeToggle from "../components/common/ThemeToggle";
+import LogoutConfirmModal from "../components/common/LogoutConfirmModal";
 import { donorService } from "../services/donorService";
 
 export default function DonorLayout() {
   const { user, updateUser, logout } = useAuth();
+  const { toasts } = useNotification();
   const navigate = useNavigate();
   const location = useLocation();
   const [isAvailable, setIsAvailable] = useState(user?.availability === "available");
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const logoutBtnRef = useRef(null);
 
-  React.useEffect(() => {
+  useEffect(() => {
     setIsAvailable(user?.availability === "available");
   }, [user?.availability]);
 
-  const handleLogout = async () => {
-    await logout();
-    navigate("/login");
+  // Close mobile drawer on route changes
+  useEffect(() => {
+    setMobileMenuOpen(false);
+  }, [location.pathname]);
+
+  // Prevent background page scrolling while mobile menu is open
+  useEffect(() => {
+    if (mobileMenuOpen) {
+      const originalOverflow = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+      return () => {
+        document.body.style.overflow = originalOverflow;
+      };
+    }
+  }, [mobileMenuOpen]);
+
+  const handleConfirmLogout = async () => {
+    try {
+      setIsLoggingOut(true);
+      await logout();
+      navigate("/login");
+    } catch (err) {
+      console.error("Logout failed", err);
+    } finally {
+      setIsLoggingOut(false);
+      setShowLogoutModal(false);
+    }
   };
 
   const toggleAvailability = async () => {
@@ -47,74 +81,102 @@ export default function DonorLayout() {
 
   const navItems = [
     { label: "Dashboard", path: "/donor", icon: LayoutDashboard },
-    { label: "Profile", path: "/donor/profile", icon: User },
-    { label: "Requests", path: "/donor/requests", icon: Droplet },
+    { label: "Requests & Radar", path: "/donor/requests", icon: Droplet },
     { label: "History", path: "/donor/history", icon: History },
+    { label: "Profile & Health", path: "/donor/profile", icon: User },
   ];
 
   return (
-    <div className="min-h-screen bg-theme-main text-theme-primary flex flex-col transition-colors">
+    <div className="min-h-screen bg-[#F8FAFC] dark:bg-[#0F1115] text-[#1E293B] dark:text-[#F1F5F9] flex flex-col transition-colors">
       {/* Top Header */}
-      <header className="bg-theme-header-top text-theme-primary sticky top-0 z-40 shadow-md border-b border-theme-header transition-colors">
+      <header className="bg-white dark:bg-[#181B21] text-[#1E293B] dark:text-[#F1F5F9] sticky top-0 z-40 border-b border-[#E2E8F0] dark:border-[#343B47] shadow-xs">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
+            {/* Logo */}
             <Link to="/donor" className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-red-600 flex items-center justify-center text-white">
-                <Droplet className="w-5 h-5 fill-current" />
+              <div className="w-8 h-8 rounded-lg bg-[#A61B2B] text-white flex items-center justify-center shadow-xs">
+                <Droplet className="w-4 h-4 fill-current" />
               </div>
-              <span className="font-bold text-base tracking-tight text-theme-primary">
-                Blood<span className="text-red-500">Ward</span>
+              <span className="font-bold text-base tracking-tight text-[#1E293B] dark:text-white">
+                Blood<span className="text-[#A61B2B]">Ward</span>
               </span>
-              <span className="px-2 py-0.5 rounded text-[10px] font-extrabold uppercase tracking-wider bg-red-500/20 text-red-400 border border-red-500/30">
-                Donor Portal
+              <span className="hidden sm:inline-flex px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider bg-[#FEF2F2] dark:bg-rose-950/40 text-[#A61B2B] dark:text-rose-400 border border-[#FECACA] dark:border-rose-900/50">
+                Donor Workspace
               </span>
             </Link>
 
-            {/* User Profile & Availability Quick Switch */}
-            <div className="flex items-center gap-3 sm:gap-4">
+            {/* Profile & Controls */}
+            <div className="flex items-center gap-2.5 sm:gap-4">
+              {/* Availability Quick Toggle */}
               <button
                 onClick={toggleAvailability}
-                className={`hidden sm:flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border transition-colors cursor-pointer ${
+                className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border transition-all cursor-pointer ${
                   isAvailable
-                    ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20"
-                    : "bg-theme-subtle text-theme-muted border-theme hover:bg-theme-hover"
+                    ? "bg-[#F0FDF4] dark:bg-emerald-950/40 text-[#166534] dark:text-emerald-300 border-[#BBF7D0] dark:border-emerald-800 hover:bg-[#DCFCE7] dark:hover:bg-emerald-900/50"
+                    : "bg-[#F8FAFC] dark:bg-[#20242C] text-[#64748B] dark:text-[#94A3B8] border-[#E2E8F0] dark:border-[#343B47] hover:bg-[#F1F5F9] dark:hover:bg-[#252A33]"
                 }`}
                 title="Click to toggle availability"
               >
                 {isAvailable ? (
                   <>
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" /> Available
+                    <CheckCircle2 className="w-3.5 h-3.5 text-[#28734A] dark:text-emerald-400" />
+                    <span className="hidden xs:inline">Available</span>
                   </>
                 ) : (
                   <>
-                    <XCircle className="w-3.5 h-3.5 text-theme-muted" /> Not Available
+                    <XCircle className="w-3.5 h-3.5 text-[#94A3B8] dark:text-zinc-500" />
+                    <span className="hidden xs:inline">Unavailable</span>
                   </>
                 )}
               </button>
 
               {user?.bloodGroup && <BloodGroupBadge group={user.bloodGroup} size="sm" />}
 
-              <div className="text-right hidden md:block">
-                <p className="text-xs font-semibold text-theme-primary leading-tight">{user?.fullName}</p>
-                <p className="text-[10px] text-theme-muted leading-tight">{user?.email}</p>
+              {/* Notification Indicator */}
+              <div className="relative p-1.5 rounded-lg bg-[#F8FAFC] dark:bg-[#20242C] border border-[#E2E8F0] dark:border-[#343B47] text-[#475569] dark:text-[#CBD5E1]">
+                <Bell className="w-4 h-4" />
+                {toasts && toasts.length > 0 && (
+                  <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-[#A61B2B] text-white text-[9px] font-mono font-bold flex items-center justify-center animate-pulse">
+                    {toasts.length}
+                  </span>
+                )}
               </div>
 
+              {/* User Identity */}
+              <div className="text-right hidden md:block">
+                <p className="text-xs font-bold text-[#1E293B] dark:text-white leading-tight">{user?.fullName || "Voluntary Donor"}</p>
+                <p className="text-[10px] text-[#64748B] dark:text-[#94A3B8] leading-tight font-medium">{user?.city || "Registered Base"}</p>
+              </div>
+
+              {/* Theme Selector - ALWAYS in header row */}
               <ThemeToggle />
 
+              {/* Sign Out */}
               <button
-                onClick={handleLogout}
-                className="p-2 rounded-xl bg-theme-subtle hover:bg-rose-500/20 text-theme-secondary hover:text-rose-500 border border-theme transition-colors cursor-pointer"
-                title="Sign Out"
+                ref={logoutBtnRef}
+                onClick={() => setShowLogoutModal(true)}
+                className="p-2 rounded-lg bg-[#F8FAFC] dark:bg-[#20242C] hover:bg-[#FEF2F2] dark:hover:bg-rose-950/30 hover:text-[#A61B2B] dark:hover:text-rose-400 text-[#64748B] dark:text-[#94A3B8] border border-[#E2E8F0] dark:border-[#343B47] transition-colors cursor-pointer"
+                title="Sign out"
+                aria-label="Sign out"
               >
-                <Power className="w-4 h-4" />
+                <LogOut className="w-4 h-4" />
+              </button>
+
+              {/* Mobile menu toggle */}
+              <button
+                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                className="md:hidden p-2 rounded-lg text-[#475569] dark:text-[#CBD5E1] hover:bg-[#F1F5F9] dark:hover:bg-[#20242C] cursor-pointer"
+                aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
+              >
+                {mobileMenuOpen ? <X className="w-5 h-5 text-[#1E293B] dark:text-white" /> : <Menu className="w-5 h-5 text-[#1E293B] dark:text-white" />}
               </button>
             </div>
           </div>
         </div>
 
-        {/* Horizontal Navigation Bar */}
-        <div className="bg-theme-header-nav border-t border-theme-header">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center gap-1 overflow-x-auto py-1">
+        {/* Desktop Navigation Tabs */}
+        <div className="hidden md:block bg-[#F8FAFC] dark:bg-[#181B21] border-t border-[#E2E8F0] dark:border-[#343B47]">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center gap-1.5 overflow-x-auto py-1.5">
             {navItems.map((item) => {
               const Icon = item.icon;
               const isActive = location.pathname === item.path;
@@ -122,10 +184,35 @@ export default function DonorLayout() {
                 <Link
                   key={item.path}
                   to={item.path}
-                  className={`flex items-center gap-2 px-3.5 py-2 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap ${
+                  className={`flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-md transition-colors whitespace-nowrap ${
                     isActive
-                      ? "bg-red-600 text-white font-bold"
-                      : "text-theme-secondary hover:bg-theme-subtle hover:text-theme-primary"
+                      ? "bg-[#1E293B] dark:bg-[#252A33] text-white dark:text-[#F1F5F9] font-semibold shadow-xs ring-1 ring-white/10"
+                      : "text-[#475569] dark:text-[#94A3B8] hover:bg-[#E2E8F0] dark:hover:bg-[#20242C] hover:text-[#1E293B] dark:hover:text-white"
+                  }`}
+                >
+                  <Icon className="w-3.5 h-3.5" />
+                  {item.label}
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Mobile Navigation Drawer */}
+        {mobileMenuOpen && (
+          <div className="md:hidden bg-white dark:bg-[#181B21] border-t border-[#E2E8F0] dark:border-[#343B47] px-4 py-3 space-y-2 shadow-2xl max-h-[calc(100dvh-3.5rem)] overflow-y-auto overflow-x-hidden overscroll-contain animate-in slide-in-from-top-2 duration-150">
+            {navItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = location.pathname === item.path;
+              return (
+                <Link
+                  key={item.path}
+                  to={item.path}
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={`flex items-center gap-2.5 px-3 py-2 text-xs font-medium rounded-lg transition-colors ${
+                    isActive
+                      ? "bg-[#1E293B] dark:bg-[#252A33] text-white dark:text-[#F1F5F9] font-semibold"
+                      : "text-[#475569] dark:text-[#94A3B8] hover:bg-[#F1F5F9] dark:hover:bg-[#20242C] hover:text-[#1E293B] dark:hover:text-white"
                   }`}
                 >
                   <Icon className="w-4 h-4" />
@@ -133,14 +220,36 @@ export default function DonorLayout() {
                 </Link>
               );
             })}
+            <div className="pt-2 border-t border-[#F1F5F9] dark:border-[#343B47]">
+              <button
+                type="button"
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  setShowLogoutModal(true);
+                }}
+                className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/20 rounded-lg transition-colors cursor-pointer"
+              >
+                <LogOut className="w-4 h-4" />
+                <span>Sign out</span>
+              </button>
+            </div>
           </div>
-        </div>
+        )}
       </header>
 
       {/* Main Content Area */}
-      <main className="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
         <Outlet />
       </main>
+
+      {/* Logout Confirmation Dialog */}
+      <LogoutConfirmModal
+        isOpen={showLogoutModal}
+        isLoading={isLoggingOut}
+        onConfirm={handleConfirmLogout}
+        onClose={() => setShowLogoutModal(false)}
+        triggerRef={logoutBtnRef}
+      />
     </div>
   );
 }

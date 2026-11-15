@@ -17,13 +17,13 @@ export default function Select({
   return (
     <div className={`space-y-1.5 ${className}`}>
       {label && (
-        <label htmlFor={id} className="block text-xs font-semibold text-theme-secondary">
-          {label} {required && <span className="text-red-500">*</span>}
+        <label htmlFor={id} className="block text-xs font-semibold text-[#1E293B] dark:text-zinc-200">
+          {label} {required && <span className="text-[#A61B2B] font-bold">*</span>}
         </label>
       )}
-      <div className="relative rounded-xl shadow-xs">
+      <div className="relative rounded-lg">
         {Icon && (
-          <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-theme-muted">
+          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-theme-muted">
             <Icon className="w-4 h-4" />
           </div>
         )}
@@ -33,13 +33,13 @@ export default function Select({
           onChange={onChange}
           required={required}
           disabled={disabled}
-          className={`w-full text-sm rounded-xl border bg-theme-input text-theme-input py-2.5 transition-all outline-none appearance-none ${
-            Icon ? "pl-10 pr-8" : "px-3.5 pr-8"
+          className={`w-full text-xs font-medium rounded-lg border border-theme bg-theme-input text-theme-input py-2.5 transition-all outline-none appearance-none ${
+            Icon ? "pl-9 pr-8" : "px-3 pr-8"
           } ${
             error
-              ? "border-red-500 focus:ring-2 focus:ring-red-500/20"
-              : "border-theme-input focus:border-red-500 focus:ring-2 focus:ring-red-500/20"
-          } disabled:bg-theme-subtle disabled:text-theme-muted`}
+              ? "border-[#A61B2B] ring-1 ring-[#A61B2B]/30"
+              : "focus:border-[#315B83] focus:ring-1 focus:ring-[#315B83]/20"
+          } disabled:bg-theme-subtle disabled:text-theme-muted disabled:cursor-not-allowed cursor-pointer`}
           {...props}
         >
           {placeholder && (
