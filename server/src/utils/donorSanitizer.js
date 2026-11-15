@@ -7,6 +7,8 @@ export const sanitizeDonorProfile = (user) => {
     phone: user.phone,
     role: user.role,
     gender: user.gender || '',
+    dateOfBirth: user.dateOfBirth || '',
+    healthQuestionnaire: user.healthQuestionnaire || {},
     bloodGroup: user.bloodGroup || null,
     availability: user.availability || 'not_available',
     state: user.state || '',

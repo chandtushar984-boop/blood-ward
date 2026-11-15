@@ -26,6 +26,20 @@ export const getCompatibleRecipientBloodGroups = (donorBloodGroup) => {
 };
 
 /**
+ * Returns array of compatible donor blood groups for a given recipient blood group.
+ * Derived directly from authoritative DONOR_TO_RECIPIENT_MAP.
+ * @param {string} recipientBloodGroup
+ * @returns {string[]}
+ */
+export const getCompatibleDonorBloodGroups = (recipientBloodGroup) => {
+  if (!recipientBloodGroup || typeof recipientBloodGroup !== 'string') return [];
+  const normalized = recipientBloodGroup.trim();
+  return Object.keys(DONOR_TO_RECIPIENT_MAP).filter((donorGroup) =>
+    DONOR_TO_RECIPIENT_MAP[donorGroup].includes(normalized)
+  );
+};
+
+/**
  * Checks whether a donor blood group is compatible with a recipient request blood group.
  * @param {string} donorBloodGroup
  * @param {string} recipientBloodGroup

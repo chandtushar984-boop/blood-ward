@@ -39,6 +39,24 @@ export const donorService = {
       throw error.response?.data || { message: "Failed to search donors" };
     }
   },
+
+  async getHealthQuestionnaire() {
+    try {
+      const response = await api.get("/donors/me/health-questionnaire");
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: "Failed to fetch health questionnaire" };
+    }
+  },
+
+  async updateHealthQuestionnaire(data) {
+    try {
+      const response = await api.put("/donors/me/health-questionnaire", data);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: "Failed to update health questionnaire" };
+    }
+  },
 };
 
 export default donorService;

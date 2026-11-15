@@ -1,3 +1,4 @@
+import './testDb.js';
 import assert from 'assert';
 import { isBloodCompatible, getCompatibleRecipientBloodGroups } from '../utils/bloodCompatibility.js';
 import { createBloodRequest, getAvailableRequests, acceptBloodRequest, rejectBloodRequest, markInProgress, fulfillBloodRequest } from '../controllers/bloodRequestController.js';

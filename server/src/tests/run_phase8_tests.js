@@ -1,3 +1,4 @@
+import './testDb.js';
 import express from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
@@ -254,6 +255,7 @@ const runSuite = async () => {
       password,
       role: 'admin',
       bloodGroup: 'O+',
+      dateOfBirth: '1995-05-15',
     }),
   });
   const donorRoleForced = regDonorRes.data.user && regDonorRes.data.user.role === 'donor';

@@ -18,13 +18,15 @@ export const REQUEST_STATUS = {
 };
 
 export const DISTANCE_OPTIONS = [
-  { label: "2 km", value: 2 },
   { label: "5 km", value: 5 },
-  { label: "7 km", value: 7 },
   { label: "10 km", value: 10 },
   { label: "20 km", value: 20 },
+  { label: "30 km", value: 30 },
+  { label: "50 km", value: 50 },
   { label: "Any distance", value: 9999 },
 ];
+
+export const CANONICAL_DISTANCE_PRESETS = [5, 10, 20, 30, 50];
 
 export const USER_ROLES = {
   ADMIN: "admin",
@@ -32,7 +34,19 @@ export const USER_ROLES = {
   RECIPIENT: "recipient",
 };
 
-// Blood Group Compatibility Map
+// RBC Compatibility: Recipient needed blood group -> Eligible Donor blood groups
+export const RBC_RECIPIENT_TO_DONOR_MAP = {
+  "A+": ["A+", "A-", "O+", "O-"],
+  "A-": ["A-", "O-"],
+  "B+": ["B+", "B-", "O+", "O-"],
+  "B-": ["B-", "O-"],
+  "AB+": ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"],
+  "AB-": ["AB-", "A-", "B-", "O-"],
+  "O+": ["O+", "O-"],
+  "O-": ["O-"],
+};
+
+// Blood Group Compatibility Map (Donor can donate to...)
 export const DONOR_COMPATIBILITY = {
   "O-": ["O-", "O+", "A-", "A+", "B-", "B+", "AB-", "AB+"], // Universal Donor
   "O+": ["O+", "A+", "B+", "AB+"],
@@ -44,4 +58,4 @@ export const DONOR_COMPATIBILITY = {
   "AB+": ["AB+"],
 };
 
-export const GENDER_OPTIONS = ['Male', 'Female', 'Other', 'Prefer not to say'];
+export const GENDER_OPTIONS = ['Male', 'Female', 'Non-binary', 'Prefer not to say'];

@@ -2,7 +2,7 @@ import jwt from "jsonwebtoken";
 import User from "../models/user.model.js";
 import AppError from "../utils/appError.js";
 import { logAuditEvent } from "../utils/auditLogger.js";
-import { ALLOWED_GENDERS, isValidPincode } from "../utils/validators.js";
+import { ALLOWED_GENDERS, isValidPincode, normalizeIndianPhone, validateDonorDOB } from "../utils/validators.js";
 
 const signToken = (id, role) => {
   const secret = process.env.JWT_SECRET;
@@ -39,6 +39,17 @@ const sendTokenResponse = (user, statusCode, res, message = "Success") => {
     pincode: user.pincode || "",
     availability: user.availability || "not_available",
     isBlocked: user.isBlocked || false,
+    dateOfBirth: user.dateOfBirth || "",
+    healthQuestionnaire: user.role === "donor" ? (user.healthQuestionnaire || {}) : undefined,
+    accountType: user.accountType || "individual",
+    hospitalName: user.hospitalName || "",
+    hospitalAddress: user.hospitalAddress || "",
+    hospitalContactPhone: user.hospitalContactPhone || "",
+    representativeDesignation: user.representativeDesignation || "",
+    authorizationNotes: user.authorizationNotes || "",
+    verificationStatus: user.verificationStatus || (user.accountType === "hospital_rep" ? "pending" : "verified"),
+    verificationRejectionReason: user.verificationRejectionReason || "",
+    verifiedAt: user.verifiedAt || null,
   };
 
   res.status(statusCode).json({
@@ -50,10 +61,35 @@ const sendTokenResponse = (user, statusCode, res, message = "Success") => {
 
 export const registerDonor = async (req, res, next) => {
   try {
-    const { fullName, email, phone, gender, password, bloodGroup, state, city, pincode, isAvailable, availability } = req.body;
+    const {
+      fullName,
+      email,
+      phone,
+      gender,
+      password,
+      bloodGroup,
+      state,
+      city,
+      pincode,
+      dateOfBirth,
+      healthQuestionnaire,
+      isAvailable,
+      availability,
+    } = req.body;
 
     if (!fullName || !email || !phone || !password || !bloodGroup) {
       return next(new AppError("Full Name, Email, Phone, Password, and Blood Group are required for donor registration.", 400));
+    }
+
+    // Date of Birth is mandatory for voluntary donor registration
+    const dobValidation = validateDonorDOB(dateOfBirth);
+    if (!dobValidation.isValid) {
+      return next(new AppError(dobValidation.message, 400));
+    }
+
+    const normalizedPhone = normalizeIndianPhone(phone);
+    if (!normalizedPhone) {
+      return next(new AppError("Please provide a valid 10-digit Indian mobile number.", 400));
     }
 
     if (gender !== undefined && gender !== "" && !ALLOWED_GENDERS.includes(gender)) {
@@ -72,10 +108,10 @@ export const registerDonor = async (req, res, next) => {
       donorAvailability = "available";
     }
 
-    const newUser = await User.create({
+    const donorData = {
       fullName: fullName.trim(),
       email: normalizedEmail,
-      phone: phone.trim(),
+      phone: normalizedPhone,
       gender: gender ? gender.trim() : "",
       password,
       role: "donor",
@@ -83,8 +119,25 @@ export const registerDonor = async (req, res, next) => {
       state: state ? state.trim() : "",
       city: city ? city.trim() : "",
       pincode: pincode ? pincode.trim() : "",
+      dateOfBirth: dateOfBirth ? String(dateOfBirth).trim() : "",
       availability: donorAvailability,
-    });
+    };
+
+    if (healthQuestionnaire && typeof healthQuestionnaire === "object") {
+      donorData.healthQuestionnaire = {
+        currentWeight: healthQuestionnaire.currentWeight ? Number(healthQuestionnaire.currentWeight) : null,
+        medicalConditions: healthQuestionnaire.medicalConditions ? String(healthQuestionnaire.medicalConditions).trim() : "",
+        medications: healthQuestionnaire.medications ? String(healthQuestionnaire.medications).trim() : "",
+        recentIllnessOrFever: Boolean(healthQuestionnaire.recentIllnessOrFever),
+        recentSurgery: Boolean(healthQuestionnaire.recentSurgery),
+        previousDonation: Boolean(healthQuestionnaire.previousDonation),
+        lastDonationDate: healthQuestionnaire.lastDonationDate ? String(healthQuestionnaire.lastDonationDate).trim() : "",
+        additionalNotes: healthQuestionnaire.additionalNotes ? String(healthQuestionnaire.additionalNotes).trim() : "",
+        updatedAt: new Date(),
+      };
+    }
+
+    const newUser = await User.create(donorData);
 
     logAuditEvent({
       actor: newUser._id,
@@ -107,14 +160,41 @@ export const registerDonor = async (req, res, next) => {
 
 export const registerRecipient = async (req, res, next) => {
   try {
-    const { fullName, email, phone, gender, password, location, state, city } = req.body;
+    const {
+      fullName,
+      email,
+      phone,
+      gender,
+      password,
+      location,
+      state,
+      city,
+      accountType = "individual",
+      hospitalName,
+      hospitalAddress,
+      hospitalContactPhone,
+      representativeDesignation,
+      authorizationNotes,
+    } = req.body;
 
     if (!fullName || !email || !phone || !password) {
       return next(new AppError("Full Name, Email, Phone, and Password are required for recipient registration.", 400));
     }
 
+    const normalizedPhone = normalizeIndianPhone(phone);
+    if (!normalizedPhone) {
+      return next(new AppError("Please provide a valid 10-digit Indian mobile number.", 400));
+    }
+
     if (gender !== undefined && gender !== "" && !ALLOWED_GENDERS.includes(gender)) {
       return next(new AppError("Invalid gender value provided.", 400));
+    }
+
+    const isHospitalRep = accountType === "hospital_rep";
+    if (isHospitalRep) {
+      if (!hospitalName || typeof hospitalName !== "string" || !hospitalName.trim()) {
+        return next(new AppError("Hospital or medical centre name is required for hospital representative registration.", 400));
+      }
     }
 
     const normalizedEmail = email.toLowerCase().trim();
@@ -129,25 +209,33 @@ export const registerRecipient = async (req, res, next) => {
     const newUser = await User.create({
       fullName: fullName.trim(),
       email: normalizedEmail,
-      phone: phone.trim(),
+      phone: normalizedPhone,
       gender: gender ? gender.trim() : "",
       password,
       role: "recipient",
       state: state ? state.trim() : "",
       city: recipientCity,
+      accountType: isHospitalRep ? "hospital_rep" : "individual",
+      hospitalName: isHospitalRep ? hospitalName.trim() : "",
+      hospitalAddress: isHospitalRep && hospitalAddress ? hospitalAddress.trim() : "",
+      hospitalContactPhone: isHospitalRep && hospitalContactPhone ? hospitalContactPhone.trim() : "",
+      representativeDesignation: isHospitalRep && representativeDesignation ? representativeDesignation.trim() : "",
+      authorizationNotes: isHospitalRep && authorizationNotes ? authorizationNotes.trim() : "",
+      verificationStatus: isHospitalRep ? "pending" : "verified",
     });
 
     logAuditEvent({
       actor: newUser._id,
       actorName: newUser.fullName,
-      action: "REGISTER_RECIPIENT",
+      action: isHospitalRep ? "REGISTER_HOSPITAL_REPRESENTATIVE" : "REGISTER_RECIPIENT",
       category: "AUTH",
       target: newUser._id.toString(),
       ipAddress: req.ip,
       severity: "NORMAL",
+      details: isHospitalRep ? `Hospital representative registered for ${hospitalName.trim()} (Pending Verification).` : "Individual recipient registered.",
     });
 
-    sendTokenResponse(newUser, 201, res, "Recipient registration successful.");
+    sendTokenResponse(newUser, 201, res, isHospitalRep ? "Hospital representative registration submitted. Account is pending verification." : "Recipient registration successful.");
   } catch (error) {
     if (error.code === 11000) {
       return next(new AppError("An account with this email address already exists.", 400));
@@ -255,31 +343,108 @@ export const logout = async (req, res) => {
   });
 };
 
-export const getMe = async (req, res) => {
-  const safeUser = {
-    id: req.user._id,
-    fullName: req.user.fullName,
-    email: req.user.email,
-    phone: req.user.phone,
-    role: req.user.role,
-    gender: req.user.gender || "",
-    bloodGroup: req.user.bloodGroup || null,
-    state: req.user.state || "",
-    city: req.user.city || "",
-    pincode: req.user.pincode || "",
-    availability: req.user.availability || "not_available",
-    isBlocked: req.user.isBlocked || false,
-  };
+export const getMe = async (req, res, next) => {
+  try {
+    let currentUser = req.user;
 
-  res.status(200).json({
-    success: true,
-    user: safeUser,
-  });
+    if (!currentUser) {
+      let token = req.cookies?.token;
+
+      if (!token && req.headers.authorization && req.headers.authorization.startsWith("Bearer")) {
+        token = req.headers.authorization.split(" ")[1];
+      }
+
+      if (!token || token === "logout" || token === "null" || token === "undefined") {
+        return res.status(200).json({
+          success: true,
+          authenticated: false,
+          user: null,
+        });
+      }
+
+      const secret = process.env.JWT_SECRET;
+      if (!secret) {
+        return next(new AppError("Server authentication misconfigured.", 500));
+      }
+
+      let decoded;
+      try {
+        decoded = jwt.verify(token, secret);
+      } catch {
+        // Expired or invalid token: return clean unauthenticated status without raising 401
+        return res.status(200).json({
+          success: true,
+          authenticated: false,
+          user: null,
+        });
+      }
+
+      currentUser = await User.findById(decoded.id);
+      if (!currentUser) {
+        return res.status(200).json({
+          success: true,
+          authenticated: false,
+          user: null,
+        });
+      }
+    }
+
+    if (currentUser.isBlocked) {
+      return next(new AppError("Your account has been blocked by system administration.", 403));
+    }
+
+    const safeUser = {
+      id: currentUser._id,
+      fullName: currentUser.fullName,
+      email: currentUser.email,
+      phone: currentUser.phone,
+      role: currentUser.role,
+      gender: currentUser.gender || "",
+      bloodGroup: currentUser.bloodGroup || null,
+      state: currentUser.state || "",
+      city: currentUser.city || "",
+      pincode: currentUser.pincode || "",
+      availability: currentUser.availability || "not_available",
+      isBlocked: currentUser.isBlocked || false,
+      dateOfBirth: currentUser.dateOfBirth || "",
+      healthQuestionnaire: currentUser.role === "donor" ? (currentUser.healthQuestionnaire || {}) : undefined,
+      accountType: currentUser.accountType || "individual",
+      hospitalName: currentUser.hospitalName || "",
+      hospitalAddress: currentUser.hospitalAddress || "",
+      hospitalContactPhone: currentUser.hospitalContactPhone || "",
+      representativeDesignation: currentUser.representativeDesignation || "",
+      authorizationNotes: currentUser.authorizationNotes || "",
+      verificationStatus: currentUser.verificationStatus || (currentUser.accountType === "hospital_rep" ? "pending" : "verified"),
+      verificationRejectionReason: currentUser.verificationRejectionReason || "",
+      verifiedAt: currentUser.verifiedAt || null,
+    };
+
+    res.status(200).json({
+      success: true,
+      authenticated: true,
+      user: safeUser,
+    });
+  } catch (error) {
+    next(error);
+  }
 };
 
 export const updateMe = async (req, res, next) => {
   try {
-    const { fullName, phone, gender, state, city, pincode } = req.body;
+    const {
+      fullName,
+      phone,
+      gender,
+      state,
+      city,
+      pincode,
+      dateOfBirth,
+      hospitalName,
+      hospitalAddress,
+      hospitalContactPhone,
+      representativeDesignation,
+      authorizationNotes,
+    } = req.body;
 
     if (fullName !== undefined) {
       if (typeof fullName !== "string" || !fullName.trim()) {
@@ -289,10 +454,11 @@ export const updateMe = async (req, res, next) => {
     }
 
     if (phone !== undefined) {
-      if (typeof phone !== "string" || !phone.trim()) {
-        return next(new AppError("Phone number must be a non-empty text string.", 400));
+      const normalizedPhone = normalizeIndianPhone(phone);
+      if (!normalizedPhone) {
+        return next(new AppError("Please provide a valid 10-digit Indian mobile number.", 400));
       }
-      req.user.phone = phone.trim();
+      req.user.phone = normalizedPhone;
     }
 
     if (gender !== undefined) {
@@ -300,6 +466,18 @@ export const updateMe = async (req, res, next) => {
         return next(new AppError("Invalid gender value provided.", 400));
       }
       req.user.gender = gender ? gender.trim() : "";
+    }
+
+    if (dateOfBirth !== undefined) {
+      req.user.dateOfBirth = dateOfBirth ? String(dateOfBirth).trim() : "";
+    }
+
+    if (req.user.role === "recipient" && req.user.accountType === "hospital_rep") {
+      if (hospitalName !== undefined) req.user.hospitalName = String(hospitalName).trim();
+      if (hospitalAddress !== undefined) req.user.hospitalAddress = String(hospitalAddress).trim();
+      if (hospitalContactPhone !== undefined) req.user.hospitalContactPhone = String(hospitalContactPhone).trim();
+      if (representativeDesignation !== undefined) req.user.representativeDesignation = String(representativeDesignation).trim();
+      if (authorizationNotes !== undefined) req.user.authorizationNotes = String(authorizationNotes).trim();
     }
 
     if (state !== undefined) {

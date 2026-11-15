@@ -13,6 +13,10 @@ import {
   BellRing,
   Inbox,
   MapPin,
+  ShieldCheck,
+  Map as MapIcon,
+  ArrowRight,
+  AlertCircle,
 } from "lucide-react";
 import BloodGroupBadge from "../../components/common/BloodGroupBadge";
 import Button from "../../components/common/Button";
@@ -25,7 +29,7 @@ export default function DonorDashboardPage() {
   const navigate = useNavigate();
 
   const [requests, setRequests] = useState([]);
-  const [selectedRadius, setSelectedRadius] = useState(10);
+  const [selectedRadius, setSelectedRadius] = useState(20);
   const [isLoading, setIsLoading] = useState(true);
   const [acceptedCount, setAcceptedCount] = useState(0);
   const [toastMessage, setToastMessage] = useState("");
@@ -38,7 +42,16 @@ export default function DonorDashboardPage() {
         params.radius = selectedRadius === 9999 ? "any" : selectedRadius;
       }
       const data = await requestService.getAvailableRequests(params);
-      setRequests(data?.requests || data || []);
+      const incoming = data?.requests || data || [];
+      // Deduplicate by unique request ID (_id / id) ensuring no duplicate React keys or card entries
+      const seenIds = new Set();
+      const uniqueRequests = incoming.filter((r) => {
+        const id = r.id || r._id;
+        if (!id || seenIds.has(id)) return false;
+        seenIds.add(id);
+        return true;
+      });
+      setRequests(uniqueRequests);
     } catch (err) {
       console.error("Failed to fetch available requests", err);
     } finally {
@@ -52,22 +65,43 @@ export default function DonorDashboardPage() {
 
   // Setup Socket.IO listener for live emergency request notifications
   useEffect(() => {
-    socketService.connect();
-
     const handleNewBroadcast = () => {
       fetchAvailableRequests();
     };
 
+    const handleUnavailable = (payload) => {
+      const reqId = payload?.requestId || payload?.id;
+      if (reqId) {
+        setRequests((prev) => prev.filter((r) => (r.id || r._id) !== reqId));
+      } else {
+        fetchAvailableRequests();
+      }
+    };
+
+    const handleReconnect = () => {
+      fetchAvailableRequests();
+    };
+
     socketService.on("bloodRequest:new", handleNewBroadcast);
+    socketService.on("request:created", handleNewBroadcast);
     socketService.on("bloodRequest:emergency", handleNewBroadcast);
-    socketService.on("bloodRequest:cancelled", handleNewBroadcast);
-    socketService.on("bloodRequest:expired", handleNewBroadcast);
+    socketService.on("bloodRequest:unavailable", handleUnavailable);
+    socketService.on("request:unavailable", handleUnavailable);
+    socketService.on("bloodRequest:cancelled", handleUnavailable);
+    socketService.on("bloodRequest:expired", handleUnavailable);
+    socketService.on("bloodRequest:fulfilled", handleUnavailable);
+    window.addEventListener("bloodward:reconnect", handleReconnect);
 
     return () => {
       socketService.off("bloodRequest:new", handleNewBroadcast);
+      socketService.off("request:created", handleNewBroadcast);
       socketService.off("bloodRequest:emergency", handleNewBroadcast);
-      socketService.off("bloodRequest:cancelled", handleNewBroadcast);
-      socketService.off("bloodRequest:expired", handleNewBroadcast);
+      socketService.off("bloodRequest:unavailable", handleUnavailable);
+      socketService.off("request:unavailable", handleUnavailable);
+      socketService.off("bloodRequest:cancelled", handleUnavailable);
+      socketService.off("bloodRequest:expired", handleUnavailable);
+      socketService.off("bloodRequest:fulfilled", handleUnavailable);
+      window.removeEventListener("bloodward:reconnect", handleReconnect);
     };
   }, []);
 
@@ -102,9 +136,19 @@ export default function DonorDashboardPage() {
       if (res && res.request) {
         setAcceptedCount((prev) => prev + 1);
         setRequests((prev) => prev.filter((r) => r.id !== requestId));
+        setToastMessage("Successfully accepted blood request! Recipient contact unlocked.");
       }
     } catch (err) {
-      alert(err.message || "Failed to accept request.");
+      if (err?.code === "DISTANCE_LIMIT_EXCEEDED" || (typeof err?.distanceKm === "number" && err.distanceKm > (err.maxAllowedKm || 20))) {
+        throw err;
+      }
+      if (err?.statusCode === 409 || err?.message?.includes("already been accepted") || err?.message?.includes("no longer active")) {
+        setToastMessage("This request was just accepted by another donor or has expired.");
+      } else if (err?.statusCode === 403 || err?.message?.includes("Unavailable")) {
+        setToastMessage("Your donor status is set to Not Available. Please switch to Available Now.");
+      } else {
+        setToastMessage(err.message || "Failed to accept request.");
+      }
       fetchAvailableRequests();
     }
   };
@@ -113,8 +157,9 @@ export default function DonorDashboardPage() {
     try {
       await requestService.reject(requestId);
       setRequests((prev) => prev.filter((r) => r.id !== requestId));
+      setToastMessage("Request declined.");
     } catch (err) {
-      alert(err.message || "Failed to decline request.");
+      setToastMessage(err.message || "Failed to decline request.");
       fetchAvailableRequests();
     }
   };
@@ -126,46 +171,76 @@ export default function DonorDashboardPage() {
   const filteredRequests = requests;
 
   return (
-    <div className="space-y-8 pb-12">
+    <div className="space-y-6 pb-12">
       <Toast message={toastMessage} onClose={() => setToastMessage("")} />
-      {/* 1. WELCOME HEADER */}
-      <div className="bg-slate-950 text-white p-6 sm:p-8 rounded-3xl shadow-xl border border-slate-800 relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-80 h-80 bg-red-600/10 rounded-full blur-3xl pointer-events-none" />
 
-        <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-          <div className="space-y-2">
-            <div className="flex flex-wrap items-center gap-2.5">
-              <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
-                Welcome back, {user?.fullName || "Blood Donor"}
-              </h1>
-              {user?.bloodGroup && <BloodGroupBadge group={user.bloodGroup} size="md" />}
+      {/* Date of Birth Required Alert for Legacy Donors */}
+      {!user?.dateOfBirth && (
+        <div className="p-4 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/50 text-amber-900 dark:text-amber-200 text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
+          <div className="flex items-start sm:items-center gap-2.5">
+            <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5 sm:mt-0" />
+            <div>
+              <span className="font-bold block">Date of Birth Completion Required</span>
+              <span className="text-amber-700 dark:text-amber-300">
+                To receive and view active emergency blood requests, voluntary donors must verify that they are at least 18 years of age.
+              </span>
             </div>
-            <p className="text-slate-300 text-xs sm:text-sm flex items-center gap-2">
-              <MapPin className="w-4 h-4 text-red-400 shrink-0" />
-              <span>Registered Location: <strong className="text-white">{user?.city || "City Not Set"}</strong></span>
-              <span className="text-slate-500">•</span>
-              <span className="text-emerald-400 font-semibold">Location Privacy Protected</span>
-            </p>
           </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => navigate("/donor/profile")}
+            className="shrink-0 text-amber-900 dark:text-amber-100 border-amber-300 dark:border-amber-700 hover:bg-amber-100 dark:hover:bg-amber-900/40"
+          >
+            Complete Profile Now
+          </Button>
+        </div>
+      )}
 
+      {/* 1. WELCOME HEADER */}
+      <div className="bg-white dark:bg-[#181B21] text-[#1E293B] dark:text-[#F1F5F9] p-6 sm:p-7 rounded-2xl border border-[#E2E8F0] dark:border-[#343B47] shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-6 transition-colors">
+        <div className="space-y-2">
           <div className="flex flex-wrap items-center gap-2.5">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => navigate("/donor/profile")}
-              className="bg-slate-900 border-slate-700 text-white hover:bg-slate-800"
-            >
-              <User className="w-4 h-4 mr-1 text-slate-400" /> Edit Profile
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => navigate("/donor/history")}
-              className="bg-slate-900 border-slate-700 text-white hover:bg-slate-800"
-            >
-              <History className="w-4 h-4 mr-1 text-slate-400" /> History
-            </Button>
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[#1E293B] dark:text-[#F1F5F9]">
+              Welcome back, {user?.fullName || "Blood Donor"}
+            </h1>
+            {user?.bloodGroup && <BloodGroupBadge group={user.bloodGroup} size="md" />}
           </div>
+          <p className="text-[#475569] dark:text-[#CBD5E1] text-xs sm:text-sm flex items-center gap-2">
+            <MapPin className="w-4 h-4 text-[#A61B2B] shrink-0" />
+            <span>Registered Location: <strong className="text-[#1E293B] dark:text-[#F1F5F9] font-semibold">{user?.city || "City Not Set"}</strong></span>
+            <span className="text-[#CBD5E1] dark:text-[#343B47]">•</span>
+            <span className="text-[#28734A] dark:text-emerald-400 text-xs inline-flex items-center gap-1 font-semibold">
+              <ShieldCheck className="w-3.5 h-3.5" /> Privacy Protected (~500m offset)
+            </span>
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={() => navigate("/donor/requests")}
+            className="font-bold text-xs"
+          >
+            <MapIcon className="w-3.5 h-3.5 mr-1.5" /> Open Dispatch Radar
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => navigate("/donor/profile")}
+            className="text-xs"
+          >
+            <User className="w-3.5 h-3.5 mr-1.5 text-[#64748B] dark:text-[#94A3B8]" /> Profile & Health
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => navigate("/donor/history")}
+            className="text-xs"
+          >
+            <History className="w-3.5 h-3.5 mr-1.5 text-[#64748B] dark:text-[#94A3B8]" /> History
+          </Button>
         </div>
       </div>
 
@@ -187,53 +262,58 @@ export default function DonorDashboardPage() {
 
       {/* 4. RELEVANT BLOOD REQUESTS PREVIEW SECTION */}
       <div className="space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-theme">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-3 border-b border-[#E2E8F0] dark:border-[#343B47]">
           <div className="space-y-0.5">
-            <h2 className="text-xl font-extrabold text-theme-primary tracking-tight flex items-center gap-2">
-              <BellRing className="w-5 h-5 text-red-600" /> Nearby Emergency Blood Requests
+            <h2 className="text-lg font-bold text-[#1E293B] dark:text-[#F1F5F9] tracking-tight flex items-center gap-2">
+              <BellRing className="w-4 h-4 text-[#A61B2B]" />
+              Nearby Emergency Blood Requests
             </h2>
-            <p className="text-xs text-theme-muted">
+            <p className="text-xs text-[#475569] dark:text-[#94A3B8]">
               Active blood requests matching your blood group ({user?.bloodGroup || "O+"})
             </p>
           </div>
 
-          {/* Distance Filter & Refresh Controls */}
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-1.5 bg-theme-card px-3 py-1.5 rounded-xl border border-theme text-xs">
-              <Filter className="w-3.5 h-3.5 text-theme-muted" />
-              <span className="text-theme-muted hidden sm:inline">Radius:</span>
+          {/* Distance Filter: strictly [5, 10, 20, 30, 50] */}
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 bg-white dark:bg-[#181B21] px-3 py-1.5 rounded-lg border border-[#E2E8F0] dark:border-[#343B47] text-xs shadow-xs">
+              <Filter className="w-3.5 h-3.5 text-[#64748B] dark:text-[#94A3B8]" />
+              <span className="text-[#64748B] dark:text-[#94A3B8] hidden sm:inline">Radius:</span>
               <select
                 value={selectedRadius}
                 onChange={(e) => setSelectedRadius(Number(e.target.value))}
-                className="font-bold text-theme-primary bg-transparent outline-none cursor-pointer"
+                className="font-bold text-[#1E293B] dark:text-[#F1F5F9] bg-transparent dark:bg-[#181B21] outline-none cursor-pointer text-xs"
               >
-                <option value={2} className="bg-theme-card text-theme-primary">Within 2 km</option>
-                <option value={5} className="bg-theme-card text-theme-primary">Within 5 km</option>
-                <option value={10} className="bg-theme-card text-theme-primary">Within 10 km</option>
-                <option value={20} className="bg-theme-card text-theme-primary">Within 20 km</option>
-                <option value={9999} className="bg-theme-card text-theme-primary">Any distance</option>
+                <option value={5} className="dark:bg-[#181B21]">Within 5 KM</option>
+                <option value={10} className="dark:bg-[#181B21]">Within 10 KM</option>
+                <option value={20} className="dark:bg-[#181B21]">Within 20 KM</option>
+                <option value={30} className="dark:bg-[#181B21]">Within 30 KM</option>
+                <option value={50} className="dark:bg-[#181B21]">Within 50 KM (Max Cap)</option>
+                <option value={9999} className="dark:bg-[#181B21]">Any distance</option>
               </select>
             </div>
 
             <button
+              type="button"
               onClick={handleRefresh}
-              className="p-2 rounded-xl bg-theme-card border border-theme text-theme-secondary hover:text-theme-primary hover:bg-theme-subtle cursor-pointer"
+              className="p-2 rounded-lg bg-white dark:bg-[#181B21] border border-[#E2E8F0] dark:border-[#343B47] text-[#64748B] dark:text-[#CBD5E1] hover:text-[#1E293B] dark:hover:text-white hover:bg-[#F8FAFC] dark:hover:bg-[#20242C] cursor-pointer shadow-xs transition-colors"
               title="Refresh requests"
             >
-              <RefreshCw className={`w-4 h-4 ${isLoading ? "animate-spin" : ""}`} />
+              <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? "animate-spin" : ""}`} />
             </button>
           </div>
         </div>
 
         {/* Requests List vs Empty State */}
         {!isAvailable ? (
-          <div className="bg-theme-card p-8 rounded-3xl border border-theme text-center space-y-3">
-            <Inbox className="w-10 h-10 text-theme-muted mx-auto" />
-            <h3 className="font-extrabold text-theme-primary text-base">
-              You are currently marked as NOT AVAILABLE
+          <div className="bg-white dark:bg-[#181B21] p-8 rounded-2xl border border-[#E2E8F0] dark:border-[#343B47] text-center space-y-3 shadow-xs">
+            <div className="w-10 h-10 rounded-full bg-[#F1F5F9] dark:bg-[#20242C] text-[#64748B] dark:text-[#94A3B8] flex items-center justify-center mx-auto">
+              <Inbox className="w-5 h-5" />
+            </div>
+            <h3 className="font-bold text-[#1E293B] dark:text-[#F1F5F9] text-base">
+              You are currently marked as Unavailable
             </h3>
-            <p className="text-xs text-theme-muted max-w-md mx-auto">
-              Emergency request notifications and donor discovery are paused for your profile. Switch your availability toggle to "AVAILABLE NOW" to view active requests nearby.
+            <p className="text-xs text-[#475569] dark:text-[#CBD5E1] max-w-md mx-auto">
+              Emergency request notifications and donor discovery are paused for your profile. Switch your availability toggle to "Available" to view active requests nearby.
             </p>
             <Button
               variant="primary"
@@ -245,31 +325,50 @@ export default function DonorDashboardPage() {
             </Button>
           </div>
         ) : filteredRequests.length === 0 ? (
-          <div className="bg-theme-card p-8 rounded-3xl border border-theme text-center space-y-3">
-            <Inbox className="w-10 h-10 text-theme-muted mx-auto" />
-            <h3 className="font-extrabold text-theme-primary text-base">
+          <div className="bg-white dark:bg-[#181B21] p-8 rounded-xl border border-[#E2E8F0] dark:border-[#343B47] text-center space-y-3 shadow-xs">
+            <div className="w-10 h-10 rounded-full bg-[#F1F5F9] dark:bg-[#20242C] text-[#64748B] dark:text-[#94A3B8] flex items-center justify-center mx-auto">
+              <Inbox className="w-5 h-5" />
+            </div>
+            <h3 className="font-bold text-[#1E293B] dark:text-[#F1F5F9] text-base">
               No matching blood requests in this radius
             </h3>
-            <p className="text-xs text-theme-muted max-w-md mx-auto">
-              There are currently no active emergency blood requests within {selectedRadius} km matching blood group {user?.bloodGroup || "O+"}.
+            <p className="text-xs text-[#475569] dark:text-[#CBD5E1] max-w-md mx-auto">
+              There are currently no active emergency blood requests within {selectedRadius === 9999 ? "any distance" : `${selectedRadius} KM`} matching blood group {user?.bloodGroup || "O+"}.
             </p>
-            <button
-              onClick={() => setSelectedRadius(20)}
-              className="text-xs font-bold text-red-600 dark:text-red-400 hover:underline inline-block pt-1 cursor-pointer"
-            >
-              Expand Search Radius to 20 km →
-            </button>
+            {selectedRadius < 20 && (
+              <button
+                type="button"
+                onClick={() => setSelectedRadius(20)}
+                className="text-xs font-bold text-[#1E293B] dark:text-[#F1F5F9] hover:underline inline-block pt-1 cursor-pointer"
+              >
+                Expand Search Radius to 20 KM →
+              </button>
+            )}
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredRequests.map((req) => (
-              <DonorRequestCard
-                key={req.id}
-                request={req}
-                onAccept={handleAcceptRequest}
-                onDecline={handleDeclineRequest}
-              />
-            ))}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-[#64748B] dark:text-[#94A3B8]">
+                Displaying {filteredRequests.length} actionable requisitions
+              </span>
+              <button
+                type="button"
+                onClick={() => navigate("/donor/requests")}
+                className="text-xs font-bold text-[#1E293B] dark:text-[#F1F5F9] hover:underline flex items-center gap-1 cursor-pointer"
+              >
+                Open Full Map & Split Console <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+              {filteredRequests.map((req) => (
+                <DonorRequestCard
+                  key={req.id}
+                  request={req}
+                  onAccept={handleAcceptRequest}
+                  onDecline={handleDeclineRequest}
+                />
+              ))}
+            </div>
           </div>
         )}
       </div>

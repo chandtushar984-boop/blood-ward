@@ -8,7 +8,7 @@ export function ThemeProvider({ children }) {
     if (savedTheme === "light" || savedTheme === "dark") {
       return savedTheme;
     }
-    return "dark"; // Default to dark mode
+    return "light"; // Default to light mode for clinical healthcare platform
   });
 
   useEffect(() => {

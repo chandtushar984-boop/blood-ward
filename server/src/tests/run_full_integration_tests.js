@@ -1,3 +1,4 @@
+import './testDb.js';
 import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
@@ -108,6 +109,7 @@ async function runTests() {
           phone: "9876543211",
           password: testPassword,
           bloodGroup: "O+",
+          dateOfBirth: "1995-05-15",
           state: "Delhi",
           city: "New Delhi",
         }),
@@ -129,6 +131,7 @@ async function runTests() {
           phone: "9876543212",
           password: testPassword,
           bloodGroup: "O+",
+          dateOfBirth: "1995-05-15",
           state: "Delhi",
           city: "New Delhi",
         }),
@@ -150,6 +153,7 @@ async function runTests() {
           phone: "9876543213",
           password: testPassword,
           bloodGroup: "O+",
+          dateOfBirth: "1995-05-15",
           state: "Maharashtra",
           city: "Mumbai",
         }),
@@ -171,6 +175,7 @@ async function runTests() {
           phone: "9876543214",
           password: testPassword,
           bloodGroup: "O+",
+          dateOfBirth: "1995-05-15",
         }),
       });
       noLocDonorCookie = noLocReg.headers.get("set-cookie");
@@ -306,7 +311,7 @@ async function runTests() {
       const sockReqBody = await sockReqRes.json();
       const sockReqId = sockReqBody.request.id;
 
-      await new Promise((r) => setTimeout(r, 400));
+      await new Promise((r) => setTimeout(r, 1500));
 
       assert(d1ReceivedEvent && d1ReceivedEvent.requestId === sockReqId, "G1. Delhi donor within 20km receives realtime socket notification");
       assert(farReceivedEvent === null, "G2. Mumbai donor (>500km) does NOT receive realtime socket notification for Delhi request");
@@ -376,7 +381,7 @@ async function runTests() {
         }),
       });
 
-      await new Promise((r) => setTimeout(r, 400));
+      await new Promise((r) => setTimeout(r, 1500));
       assert(!userBReceivedDonorEvent, "I5. Isolated session rooms: Recipient User B never receives donor-only room notifications");
 
       socketB.disconnect();

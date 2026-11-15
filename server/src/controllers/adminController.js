@@ -70,7 +70,7 @@ export const getAdminDashboard = async (req, res, next) => {
  */
 export const getAdminUsers = async (req, res, next) => {
   try {
-    const { role, isBlocked, search, page = 1, limit = 10 } = req.query;
+    const { role, isBlocked, search, verificationStatus, accountType, page = 1, limit = 10 } = req.query;
 
     const pageNum = Math.max(1, parseInt(page, 10) || 1);
     const limitNum = Math.min(50, Math.max(1, parseInt(limit, 10) || 10));
@@ -85,6 +85,14 @@ export const getAdminUsers = async (req, res, next) => {
       query.isBlocked = isBlocked === 'true' || isBlocked === true;
     }
 
+    if (verificationStatus && ['pending', 'verified', 'rejected'].includes(verificationStatus)) {
+      query.verificationStatus = verificationStatus;
+    }
+
+    if (accountType && ['individual', 'hospital_rep'].includes(accountType)) {
+      query.accountType = accountType;
+    }
+
     if (search && typeof search === 'string' && search.trim() !== '') {
       const term = search.trim();
       query.$or = [
@@ -92,6 +100,7 @@ export const getAdminUsers = async (req, res, next) => {
         { email: { $regex: term, $options: 'i' } },
         { phone: { $regex: term, $options: 'i' } },
         { city: { $regex: term, $options: 'i' } },
+        { hospitalName: { $regex: term, $options: 'i' } },
       ];
     }
 
@@ -113,8 +122,16 @@ export const getAdminUsers = async (req, res, next) => {
       bloodGroup: u.bloodGroup || null,
       availability: u.availability || 'not_available',
       city: u.city || '',
+      state: u.state || '',
       pincode: u.pincode || '',
       isBlocked: u.isBlocked || false,
+      accountType: u.accountType || 'individual',
+      hospitalName: u.hospitalName || '',
+      hospitalAddress: u.hospitalAddress || '',
+      representativeDesignation: u.representativeDesignation || '',
+      verificationStatus: u.verificationStatus || (u.accountType === 'hospital_rep' ? 'pending' : 'verified'),
+      verificationRejectionReason: u.verificationRejectionReason || '',
+      verifiedAt: u.verifiedAt,
       lastActiveAt: u.lastActiveAt,
       createdAt: u.createdAt,
     }));
@@ -150,12 +167,26 @@ export const getAdminUserById = async (req, res, next) => {
       email: user.email,
       phone: user.phone,
       role: user.role,
+      gender: user.gender || '',
+      dateOfBirth: user.dateOfBirth || '',
       bloodGroup: user.bloodGroup || null,
       availability: user.availability || 'not_available',
       city: user.city || '',
+      state: user.state || '',
       pincode: user.pincode || '',
       location: user.location || null,
       isBlocked: user.isBlocked || false,
+      accountType: user.accountType || 'individual',
+      hospitalName: user.hospitalName || '',
+      hospitalAddress: user.hospitalAddress || '',
+      hospitalContactPhone: user.hospitalContactPhone || '',
+      representativeDesignation: user.representativeDesignation || '',
+      authorizationNotes: user.authorizationNotes || '',
+      verificationStatus: user.verificationStatus || (user.accountType === 'hospital_rep' ? 'pending' : 'verified'),
+      verificationRejectionReason: user.verificationRejectionReason || '',
+      verifiedAt: user.verifiedAt,
+      verifiedBy: user.verifiedBy,
+      healthQuestionnaire: user.role === 'donor' ? (user.healthQuestionnaire || {}) : undefined,
       lastActiveAt: user.lastActiveAt,
       createdAt: user.createdAt,
     };
@@ -190,7 +221,7 @@ export const blockUser = async (req, res, next) => {
     targetUser.isBlocked = true;
     await targetUser.save({ validateBeforeSave: false });
 
-    logAuditEvent({
+    await logAuditEvent({
       actor: req.user._id,
       actorName: req.user.fullName,
       action: 'BLOCK_USER',
@@ -232,7 +263,7 @@ export const unblockUser = async (req, res, next) => {
     targetUser.isBlocked = false;
     await targetUser.save({ validateBeforeSave: false });
 
-    logAuditEvent({
+    await logAuditEvent({
       actor: req.user._id,
       actorName: req.user.fullName,
       action: 'UNBLOCK_USER',
@@ -278,7 +309,7 @@ export const deactivateUser = async (req, res, next) => {
     targetUser.isBlocked = true;
     await targetUser.save({ validateBeforeSave: false });
 
-    logAuditEvent({
+    await logAuditEvent({
       actor: req.user._id,
       actorName: req.user.fullName,
       action: 'DEACTIVATE_USER',
@@ -292,6 +323,80 @@ export const deactivateUser = async (req, res, next) => {
     res.status(200).json({
       success: true,
       message: `User account ${targetUser.email} has been deactivated successfully.`,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Verify or reject a recipient / hospital representative account
+ * @route   PATCH /api/admin/users/:id/verification
+ * @access  Private (Admin only)
+ */
+export const verifyUser = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { status, rejectionReason } = req.body;
+
+    if (!['verified', 'rejected', 'pending'].includes(status)) {
+      return next(new AppError("Verification status must be 'verified', 'rejected', or 'pending'.", 400));
+    }
+
+    if (status === 'rejected' && (!rejectionReason || !String(rejectionReason).trim())) {
+      return next(new AppError('A rejection reason is required when rejecting verification.', 400));
+    }
+
+    const targetUser = await User.findById(id);
+    if (!targetUser) {
+      return next(new AppError('User account not found.', 404));
+    }
+
+    const prevStatus = targetUser.verificationStatus || 'pending';
+    targetUser.verificationStatus = status;
+
+    if (status === 'rejected') {
+      targetUser.verificationRejectionReason = String(rejectionReason).trim();
+    } else if (status === 'verified') {
+      targetUser.verificationRejectionReason = '';
+      targetUser.verifiedAt = new Date();
+      targetUser.verifiedBy = req.user._id;
+
+      // Automatically promote any 'Pending Verification' requests owned by this verified recipient to 'Active'
+      const pendingRequests = await BloodRequest.find({ recipient: targetUser._id, status: 'Pending Verification' });
+      for (const pr of pendingRequests) {
+        pr.status = 'Active';
+        await pr.save();
+      }
+    }
+
+    await targetUser.save({ validateBeforeSave: false });
+
+    await logAuditEvent({
+      actor: req.user._id,
+      actorName: req.user.fullName,
+      action: status === 'verified' ? 'APPROVE_HOSPITAL_VERIFICATION' : 'REJECT_HOSPITAL_VERIFICATION',
+      category: 'ADMIN_ACTION',
+      target: id,
+      ipAddress: req.ip,
+      severity: 'HIGH',
+      details: `Admin ${req.user.fullName} updated verification status for ${targetUser.fullName} (${targetUser.hospitalName || targetUser.email}) from '${prevStatus}' to '${status}'.${status === 'rejected' ? ` Reason: ${rejectionReason.trim()}` : ''}`,
+    });
+
+    emitToUser(targetUser._id, 'recipient:verification_updated', {
+      userId: targetUser._id.toString(),
+      verificationStatus: targetUser.verificationStatus,
+      verificationRejectionReason: targetUser.verificationRejectionReason,
+    });
+
+    res.status(200).json({
+      success: true,
+      message: `Account verification status updated to '${status}'.`,
+      user: {
+        id: targetUser._id,
+        verificationStatus: targetUser.verificationStatus,
+        verificationRejectionReason: targetUser.verificationRejectionReason,
+      },
     });
   } catch (error) {
     next(error);
@@ -399,7 +504,7 @@ export const cancelAdminRequest = async (req, res, next) => {
     await bloodRequest.save({ validateBeforeSave: false });
 
     const acPayload = { requestId: id, status: 'Cancelled' }; if (bloodRequest.recipient) emitToUser(bloodRequest.recipient, 'bloodRequest:cancelled', acPayload); if (bloodRequest.acceptedDonor) emitToUser(bloodRequest.acceptedDonor, 'bloodRequest:cancelled', acPayload);
-    logAuditEvent({
+    await logAuditEvent({
       actor: req.user._id,
       actorName: req.user.fullName,
       action: 'ADMIN_CANCEL_REQUEST',

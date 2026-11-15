@@ -1,4 +1,5 @@
-﻿import dotenv from 'dotenv';
+import './testDb.js';
+import dotenv from 'dotenv';
 dotenv.config();
 import assert from 'assert';
 import mongoose from 'mongoose';
@@ -37,6 +38,7 @@ export async function runLocationIntegrityTests() {
         phone: '9998887771',
         password: 'password123',
         bloodGroup: 'O+',
+        dateOfBirth: '1995-05-15',
         state: 'Delhi',
         city: 'New Delhi',
         location: { type: 'Point', coordinates: [72.8777, 19.0760] }
@@ -146,7 +148,7 @@ export async function runLocationIntegrityTests() {
     let jsonResult = null;
     const mockRes = { status(c) { statusCode = c; return this; }, json(data) { jsonResult = data; return this; } };
     const mockNext = (err) => { if (err) { statusCode = err.statusCode || 500; jsonResult = { message: err.message }; } };
-    const reqG = { user: recipientG, body: { bloodGroup: 'AB+', unitsNeeded: 1, hospitalName: 'City Hospital', city: 'Mumbai', urgency: 'Normal', requiredDate: '2026-12-31' } };
+    const reqG = { user: recipientG, body: { bloodGroup: 'AB+', unitsNeeded: 1, hospitalName: 'Location Integrity City Hospital', city: 'Mumbai', urgency: 'Normal', requiredDate: '2026-12-31' } };
     await createBloodRequest(reqG, mockRes, mockNext);
     assert.strictEqual(statusCode, 201, 'Test G failed');
     const createdReq = await BloodRequest.findById(jsonResult.request._owner || jsonResult.request._id || jsonResult.request.id);
@@ -174,7 +176,7 @@ export async function runLocationIntegrityTests() {
   }
 
   await User.deleteMany({ email: /@location_integrity_test\.com$/ });
-  await BloodRequest.deleteMany({ hospitalName: /City Hospital H|Bangalore Hospital/ });
+  await BloodRequest.deleteMany({ hospitalName: /Location Integrity City Hospital|City Hospital H|Bangalore Hospital/ });
 
   console.log('\nFINAL RESULTS: ' + passCount + '/' + totalTests);
   if (process.argv[1] && process.argv[1].endsWith('run_location_integrity_tests.js')) {

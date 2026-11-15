@@ -3,16 +3,49 @@ import { DEFAULT_MATCHING_RADIUS_KM } from '../config/constants.js';
 import BloodRequest from '../models/bloodRequest.js';
 import User from '../models/user.model.js';
 import AppError from '../utils/appError.js';
-import { isValidBloodGroup, isValidGeoCoordinates } from '../utils/validators.js';
+import { isValidBloodGroup, isValidGeoCoordinates, validateDonorDOB } from '../utils/validators.js';
 import { sanitizeBloodRequest } from '../utils/requestSanitizer.js';
 import { logAuditEvent } from '../utils/auditLogger.js';
 import { getCityCoordinates } from '../utils/cityCoordinates.js';
-import { notifyMatchingDonors, emitToUser } from '../socket.js';
+import { notifyMatchingDonors, emitToUser, emitToRole } from '../socket.js';
 
 /**
  * Auto-expiration helper for requests whose requiredDate has passed
  */
 
+
+export const ALLOWED_RADIUS_PRESETS = [5, 10, 20, 30, 50];
+
+/**
+ * Calculate default radius based on date horizon in Asia/Kolkata (IST):
+ * - Today (diff <= 0): 20 km
+ * - Tomorrow (diff === 1): 30 km
+ * - 2+ days later (diff >= 2): 50 km
+ */
+export const calculateDefaultRadiusKm = (requiredDate) => {
+  if (!requiredDate) return 20;
+
+  const nowIST = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
+
+  let targetYMD = '';
+  const dateStr = String(requiredDate).trim();
+  const ymdMatch = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (ymdMatch) {
+    targetYMD = `${ymdMatch[1]}-${ymdMatch[2]}-${ymdMatch[3]}`;
+  } else {
+    const parsed = new Date(dateStr);
+    if (Number.isNaN(parsed.getTime())) return 20;
+    targetYMD = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(parsed);
+  }
+
+  const nowDate = new Date(`${nowIST}T00:00:00+05:30`);
+  const targetDate = new Date(`${targetYMD}T00:00:00+05:30`);
+  const diffDays = Math.round((targetDate.getTime() - nowDate.getTime()) / (1000 * 60 * 60 * 24));
+
+  if (diffDays <= 0) return 20;
+  if (diffDays === 1) return 30;
+  return 50;
+};
 
 const calculateHaversineDistance = (coords1, coords2) => {
   if (!coords1 || !coords2 || coords1.length < 2 || coords2.length < 2) return null;
@@ -33,21 +66,42 @@ const calculateHaversineDistance = (coords1, coords2) => {
 
 const checkAndExpireRequest = async (request) => {
   if (!request || request.status !== 'Active') return request;
-  if (request.requiredDate) {
-    const reqDate = new Date(request.requiredDate);
-    if (!Number.isNaN(reqDate.getTime()) && reqDate < new Date()) {
-      request.status = 'Expired';
-      await request.save({ validateBeforeSave: false });
+  if (!request.requiredDate) return request;
+
+  let expiryTimestamp;
+  const dateStr = String(request.requiredDate).trim();
+
+  // If date is in YYYY-MM-DD format, set expiry to 23:59:59.999 in IST (+05:30)
+  const ymdMatch = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (ymdMatch) {
+    const [, year, month, day] = ymdMatch;
+    expiryTimestamp = new Date(`${year}-${month}-${day}T23:59:59.999+05:30`).getTime();
+  } else {
+    const parsed = new Date(dateStr);
+    if (Number.isNaN(parsed.getTime())) return request;
+    // Set to end of that calendar day in IST
+    const ymdInIST = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(parsed);
+    expiryTimestamp = new Date(`${ymdInIST}T23:59:59.999+05:30`).getTime();
+  }
+
+  if (Date.now() > expiryTimestamp) {
+    request.status = 'Expired';
+    await request.save({ validateBeforeSave: false });
+
+    const expPayload = { requestId: request._id.toString(), status: 'Expired' };
+    if (request.recipient) emitToUser(request.recipient, 'bloodRequest:statusChanged', expPayload);
+    emitToRole('donor', 'bloodRequest:expired', expPayload);
+    emitToRole('donor', 'bloodRequest:unavailable', expPayload);
+    emitToRole('donor', 'request:unavailable', expPayload);
 
     logAuditEvent({
-        actor: null,
-        actorName: 'System',
-        action: 'EXPIRE_REQUEST',
-        category: 'SYSTEM',
-        target: request._id.toString(),
-        details: `Request expired automatically as requiredDate ${request.requiredDate} passed.`,
-      });
-    }
+      actor: null,
+      actorName: 'System',
+      action: 'EXPIRE_REQUEST',
+      category: 'SYSTEM',
+      target: request._id.toString(),
+      details: `Request expired automatically after end of required date: ${dateStr}.`,
+    });
   }
   return request;
 };
@@ -67,6 +121,7 @@ export const createBloodRequest = async (req, res, next) => {
       location,
       urgency = 'Normal',
       requiredDate,
+      radiusKm,
       additionalNotes = '',
     } = req.body;
 
@@ -118,6 +173,32 @@ export const createBloodRequest = async (req, res, next) => {
       return next(new AppError('Required date is required.', 400));
     }
 
+    let finalRadius = 20;
+    if (radiusKm !== undefined && radiusKm !== null && radiusKm !== '') {
+      const parsedRadius = Number(radiusKm);
+      if (!ALLOWED_RADIUS_PRESETS.includes(parsedRadius)) {
+        return next(new AppError('Radius must be one of the approved presets: 5, 10, 20, 30, or 50 KM.', 400));
+      }
+      finalRadius = parsedRadius;
+    } else {
+      finalRadius = calculateDefaultRadiusKm(requiredDate);
+    }
+
+    let normalizedRequiredDate = String(requiredDate).trim();
+    const ymdMatch = normalizedRequiredDate.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (ymdMatch) {
+      normalizedRequiredDate = `${ymdMatch[1]}-${ymdMatch[2]}-${ymdMatch[3]}`;
+    } else {
+      const parsed = new Date(normalizedRequiredDate);
+      if (!Number.isNaN(parsed.getTime())) {
+        normalizedRequiredDate = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(parsed);
+      }
+    }
+
+    const isHospitalRep = recipient.accountType === 'hospital_rep';
+    const isVerified = !isHospitalRep || recipient.verificationStatus === 'verified';
+    const initialStatus = isVerified ? 'Active' : 'Pending Verification';
+
     const newRequest = await BloodRequest.create({
       recipient: req.user._id || req.user.id,
       recipientName: recipient?.fullName || req.user.fullName || 'Recipient',
@@ -127,9 +208,11 @@ export const createBloodRequest = async (req, res, next) => {
       city: targetCity,
       location: reqLocation,
       urgency,
-      requiredDate: new Date(requiredDate),
+      requiredDate: normalizedRequiredDate,
+      radiusKm: finalRadius,
+      notifiedDonors: [],
       additionalNotes: additionalNotes ? additionalNotes.trim() : '',
-      status: 'Active',
+      status: initialStatus,
     });
 
     logAuditEvent({
@@ -140,6 +223,9 @@ export const createBloodRequest = async (req, res, next) => {
       target: newRequest._id.toString(),
       ipAddress: req.ip,
       severity: urgency === 'Emergency' ? 'HIGH' : 'NORMAL',
+      details: isVerified
+        ? `Request created in Active status.`
+        : `Request created in Pending Verification status (Hospital account awaiting admin approval).`,
     });
 
     const populatedRequest = await BloodRequest.findById(newRequest._id).populate(
@@ -147,12 +233,17 @@ export const createBloodRequest = async (req, res, next) => {
       'fullName email phone'
     );
 
-    notifyMatchingDonors(populatedRequest);
+    if (isVerified) {
+      notifyMatchingDonors(populatedRequest);
+    }
 
     res.status(201).json({
       success: true,
-      message: 'Blood request created successfully.',
+      message: isVerified
+        ? 'Blood request created successfully.'
+        : 'Blood request submitted and held in Pending Verification. Donor matching will begin once hospital account verification is approved.',
       request: sanitizeBloodRequest(newRequest, req.user.role, req.user._id || req.user.id),
+      isPendingVerification: !isVerified,
     });
   } catch (error) {
     next(error);
@@ -165,6 +256,12 @@ export const getMyRequests = async (req, res, next) => {
 
     const pageNum = Math.max(1, parseInt(page, 10) || 1);
     const limitNum = Math.min(50, Math.max(1, parseInt(limit, 10) || 10));
+
+    // Expire overdue active requests for this recipient
+    const activeRequests = await BloodRequest.find({ recipient: req.user._id, status: 'Active' });
+    for (const doc of activeRequests) {
+      await checkAndExpireRequest(doc);
+    }
 
     const query = { recipient: req.user._id };
     if (status && typeof status === 'string' && status.trim() !== '') {
@@ -211,6 +308,34 @@ export const getAvailableRequests = async (req, res, next) => {
     const { bloodGroup, radius = '20', page = 1, limit = 10 } = req.query;
     const pageNum = Math.max(1, parseInt(page, 10) || 1);
     const limitNum = Math.min(50, Math.max(1, parseInt(limit, 10) || 10));
+
+    // Mandatory Date of Birth / adult age check for receiving donation requests
+    if (!req.user.dateOfBirth) {
+      return res.status(200).json({
+        success: true,
+        count: 0,
+        total: 0,
+        page: pageNum,
+        totalPages: 1,
+        requiresProfileCompletion: true,
+        message: 'Please complete your date of birth in your profile before receiving donation requests.',
+        requests: [],
+      });
+    }
+
+    const ageValidation = validateDonorDOB(req.user.dateOfBirth);
+    if (!ageValidation.isValid) {
+      return res.status(200).json({
+        success: true,
+        count: 0,
+        total: 0,
+        page: pageNum,
+        totalPages: 1,
+        requiresProfileCompletion: true,
+        message: ageValidation.message,
+        requests: [],
+      });
+    }
 
     // Auto-expire overdue requests
     const activeDocs = await BloodRequest.find({ status: 'Active' });
@@ -278,7 +403,8 @@ export const getAvailableRequests = async (req, res, next) => {
         dist = calculateHaversineDistance(donorCoords, reqCoords);
       }
 
-      if (isAnyDistance || (dist !== null && dist <= radiusKm)) {
+      const reqRadius = reqDoc.radiusKm || DEFAULT_MATCHING_RADIUS_KM;
+      if (isAnyDistance || (dist !== null && dist <= reqRadius && dist <= radiusKm)) {
         requestsWithDistance.push({ ...sanitized, distanceKm: dist });
       }
     }
@@ -350,6 +476,15 @@ export const acceptBloodRequest = async (req, res, next) => {
       return next(new AppError('Unavailable or blocked donors cannot accept requests.', 403));
     }
 
+    if (!req.user.dateOfBirth) {
+      return next(new AppError('Please complete your date of birth in your profile before accepting donation requests.', 400));
+    }
+
+    const ageValidation = validateDonorDOB(req.user.dateOfBirth);
+    if (!ageValidation.isValid) {
+      return next(new AppError(ageValidation.message, 400));
+    }
+
     const { id } = req.params;
 
     let targetRequest = await BloodRequest.findById(id);
@@ -391,8 +526,16 @@ export const acceptBloodRequest = async (req, res, next) => {
     }
 
     const dist = calculateHaversineDistance(donorCoords, reqCoords);
-    if (dist === null || dist > DEFAULT_MATCHING_RADIUS_KM) {
-      return next(new AppError(`You are outside the eligible ${DEFAULT_MATCHING_RADIUS_KM} km radius for this blood request.`, 400));
+    const maxAllowedKm = targetRequest.radiusKm || DEFAULT_MATCHING_RADIUS_KM;
+    if (dist === null || dist > maxAllowedKm) {
+      return res.status(400).json({
+        success: false,
+        code: 'DISTANCE_LIMIT_EXCEEDED',
+        message: 'You are too far away to accept this request.',
+        supportingText: `This blood request is outside your eligible service area. You must be within ${maxAllowedKm} KM of the request location to accept it.`,
+        distanceKm: dist,
+        maxAllowedKm,
+      });
     }
 
     // Atomic conditional update to prevent race conditions
@@ -420,6 +563,10 @@ export const acceptBloodRequest = async (req, res, next) => {
       const recId = updatedRequest.recipient._id || updatedRequest.recipient;
       emitToUser(recId, 'bloodRequest:accepted', sanitizeBloodRequest(updatedRequest, 'recipient', recId));
     }
+
+    const unavailPayload = { requestId: id, status: 'Donor Accepted' };
+    emitToRole('donor', 'bloodRequest:unavailable', unavailPayload);
+    emitToRole('donor', 'request:unavailable', unavailPayload);
 
     logAuditEvent({
       actor: req.user._id,
@@ -489,8 +636,9 @@ export const rejectBloodRequest = async (req, res, next) => {
     }
 
     const dist = calculateHaversineDistance(donorCoords, reqCoords);
-    if (dist === null || dist > DEFAULT_MATCHING_RADIUS_KM) {
-      return next(new AppError(`You are outside the eligible ${DEFAULT_MATCHING_RADIUS_KM} km radius to decline this blood request.`, 400));
+    const maxAllowedKm = bloodRequest.radiusKm || DEFAULT_MATCHING_RADIUS_KM;
+    if (dist === null || dist > maxAllowedKm) {
+      return next(new AppError(`You are outside the eligible ${maxAllowedKm} km radius to decline this blood request.`, 400));
     }
 
     if (!bloodRequest.declinedDonors) {
@@ -600,7 +748,12 @@ export const fulfillBloodRequest = async (req, res, next) => {
     bloodRequest.status = 'Fulfilled';
     await bloodRequest.save({ validateBeforeSave: false });
 
-    const fPayload = { requestId: id, status: 'Fulfilled' }; if (bloodRequest.recipient) emitToUser(bloodRequest.recipient, 'bloodRequest:fulfilled', fPayload); if (bloodRequest.acceptedDonor) emitToUser(bloodRequest.acceptedDonor, 'bloodRequest:fulfilled', fPayload);
+    const fPayload = { requestId: id, status: 'Fulfilled' };
+    if (bloodRequest.recipient) emitToUser(bloodRequest.recipient, 'bloodRequest:fulfilled', fPayload);
+    if (bloodRequest.acceptedDonor) emitToUser(bloodRequest.acceptedDonor, 'bloodRequest:fulfilled', fPayload);
+    emitToRole('donor', 'bloodRequest:fulfilled', fPayload);
+    emitToRole('donor', 'bloodRequest:unavailable', fPayload);
+    emitToRole('donor', 'request:unavailable', fPayload);
     logAuditEvent({
       actor: req.user._id,
       actorName: req.user.fullName,
@@ -651,7 +804,12 @@ export const cancelBloodRequest = async (req, res, next) => {
     bloodRequest.status = 'Cancelled';
     await bloodRequest.save({ validateBeforeSave: false });
 
-    const cPayload = { requestId: id, status: 'Cancelled' }; if (bloodRequest.recipient) emitToUser(bloodRequest.recipient, 'bloodRequest:cancelled', cPayload); if (bloodRequest.acceptedDonor) emitToUser(bloodRequest.acceptedDonor, 'bloodRequest:cancelled', cPayload);
+    const cPayload = { requestId: id, status: 'Cancelled' };
+    if (bloodRequest.recipient) emitToUser(bloodRequest.recipient, 'bloodRequest:cancelled', cPayload);
+    if (bloodRequest.acceptedDonor) emitToUser(bloodRequest.acceptedDonor, 'bloodRequest:cancelled', cPayload);
+    emitToRole('donor', 'bloodRequest:cancelled', cPayload);
+    emitToRole('donor', 'bloodRequest:unavailable', cPayload);
+    emitToRole('donor', 'request:unavailable', cPayload);
     logAuditEvent({
       actor: req.user._id,
       actorName: req.user.fullName,
@@ -736,6 +894,74 @@ export const getDonorHistory = async (req, res, next) => {
       page: pageNum,
       totalPages: Math.ceil(totalDocs / limitNum) || 1,
       requests: paginatedItems,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Recipient expands search radius for an active blood request
+ * @route   PATCH /api/requests/:id/expand-radius
+ * @access  Private (Recipient only)
+ */
+export const expandBloodRequestRadius = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { newRadiusKm } = req.body;
+
+    const parsedRadius = Number(newRadiusKm);
+    if (!ALLOWED_RADIUS_PRESETS.includes(parsedRadius)) {
+      return next(new AppError('Invalid radius. Allowed presets: 5, 10, 20, 30, 50 KM.', 400));
+    }
+
+    const bloodRequest = await BloodRequest.findById(id);
+    if (!bloodRequest) {
+      return next(new AppError('Blood request not found.', 404));
+    }
+
+    const recipientId = bloodRequest.recipient?._id || bloodRequest.recipient;
+    if (recipientId.toString() !== (req.user._id || req.user.id).toString()) {
+      return next(new AppError('Only the owning recipient can expand the request radius.', 403));
+    }
+
+    if (bloodRequest.status !== 'Active' && bloodRequest.status !== 'Created') {
+      return next(new AppError(`Cannot expand radius for request in '${bloodRequest.status}' status. Only active pending requests can be expanded.`, 400));
+    }
+
+    const currentRadius = bloodRequest.radiusKm || 20;
+    if (parsedRadius <= currentRadius) {
+      return next(new AppError(`New radius (${parsedRadius} KM) must be greater than current radius (${currentRadius} KM).`, 400));
+    }
+
+    const previousRadius = currentRadius;
+    bloodRequest.radiusKm = parsedRadius;
+
+    // Find and notify only newly eligible donors
+    const newlyNotifiedCount = await notifyMatchingDonors(bloodRequest, true);
+
+    await bloodRequest.save();
+
+    logAuditEvent({
+      actor: req.user._id || req.user.id,
+      actorName: req.user.fullName,
+      action: 'EXPAND_REQUEST_RADIUS',
+      category: 'RECIPIENT_ACTION',
+      target: id,
+      ipAddress: req.ip,
+      severity: 'NORMAL',
+      details: `Recipient expanded request radius from ${previousRadius} KM to ${parsedRadius} KM. ${newlyNotifiedCount} new donor(s) notified.`,
+    });
+
+    const populated = await BloodRequest.findById(id)
+      .populate('recipient', 'fullName email phone')
+      .populate('acceptedDonor', 'fullName phone bloodGroup city');
+
+    res.status(200).json({
+      success: true,
+      message: `Search radius expanded to ${parsedRadius} KM. ${newlyNotifiedCount} new donor(s) notified.`,
+      request: sanitizeBloodRequest(populated, req.user.role, req.user._id || req.user.id),
+      newlyNotifiedCount,
     });
   } catch (error) {
     next(error);

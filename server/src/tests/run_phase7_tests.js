@@ -1,3 +1,4 @@
+import './testDb.js';
 import express from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
@@ -83,6 +84,7 @@ const runSuite = async () => {
     password,
     role: 'donor',
     bloodGroup: 'O+',
+    dateOfBirth: '1995-05-15',
     availability: 'available',
     state: 'Delhi',
     city: 'Delhi',
@@ -96,6 +98,7 @@ const runSuite = async () => {
     password,
     role: 'donor',
     bloodGroup: 'O+',
+    dateOfBirth: '1995-05-15',
     availability: 'available',
     state: 'Delhi',
     city: 'Delhi',

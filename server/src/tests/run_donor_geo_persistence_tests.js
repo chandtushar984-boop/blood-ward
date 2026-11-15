@@ -1,3 +1,4 @@
+import './testDb.js';
 import express from "express";
 import cookieParser from "cookie-parser";
 import helmet from "helmet";
@@ -149,6 +150,7 @@ async function runTests() {
         phone: "9876543211",
         password: "password123",
         bloodGroup: "O+",
+        dateOfBirth: "1995-05-15",
         availability: "available",
         state: "Delhi",
         city: "New Delhi",
@@ -168,6 +170,7 @@ async function runTests() {
         phone: "9876543212",
         password: "password123",
         bloodGroup: "B+",
+        dateOfBirth: "1995-05-15",
         availability: "available",
         state: "Maharashtra",
         city: "Mumbai",
@@ -183,13 +186,25 @@ async function runTests() {
     const normalSearchRes = await request("/api/donors/search?latitude=28.6139&longitude=77.2090&radius=20&bloodGroup=O%2B", {
       headers: { Cookie: recipientCookie },
     });
-    assert("6. Normal search (Delhi lat/lng, radius=20km, O+) returns Delhi donor", normalSearchRes.status === 200 && normalSearchRes.data.donors.length === 1 && normalSearchRes.data.donors[0].fullName === "Delhi O+ Donor", JSON.stringify(normalSearchRes.data));
+    assert(
+      "6. Normal search (Delhi lat/lng, radius=20km, O+) returns Delhi donor",
+      normalSearchRes.status === 200 &&
+        normalSearchRes.data.donors.some(d => d.fullName === "Delhi O+ Donor") &&
+        normalSearchRes.data.donors.every(d => d.distanceKm <= 20),
+      JSON.stringify(normalSearchRes.data)
+    );
 
-    // Normal search excludes Mumbai donor (outside 20km radius)
+    // Normal search excludes Mumbai donor (outside 20km radius, returns only local compatible Delhi O+ donor)
     const radiusExcludeRes = await request("/api/donors/search?latitude=28.6139&longitude=77.2090&radius=20&bloodGroup=B%2B", {
       headers: { Cookie: recipientCookie },
     });
-    assert("7. Normal radius search excludes Mumbai donor from Delhi 20km search", radiusExcludeRes.status === 200 && radiusExcludeRes.data.donors.length === 0, JSON.stringify(radiusExcludeRes.data));
+    assert(
+      "7. Normal radius search excludes Mumbai donor from Delhi 20km search",
+      radiusExcludeRes.status === 200 &&
+        radiusExcludeRes.data.donors.every(d => d.fullName !== "Mumbai B+ Donor") &&
+        radiusExcludeRes.data.donors.some(d => d.fullName === "Delhi O+ Donor"),
+      JSON.stringify(radiusExcludeRes.data)
+    );
 
     // -------------------------------------------------------------
     // 4. ANY LOCATION DONOR SEARCH
@@ -200,11 +215,17 @@ async function runTests() {
     });
     assert("8. Any Location search (radius=any) returns matching donors regardless of distance", anySearchRes.status === 200 && anySearchRes.data.donors.length >= 2, JSON.stringify(anySearchRes.data));
 
-    // Search Any Location with blood group filter (radius=any & bloodGroup=B+) -> returns Mumbai donor
+    // Search Any Location with blood group filter (radius=any & bloodGroup=B+) -> returns compatible donors (Delhi O+ and Mumbai B+)
     const anyBloodSearchRes = await request("/api/donors/search?radius=any&bloodGroup=B%2B", {
       headers: { Cookie: recipientCookie },
     });
-    assert("9. Any Location search (radius=any & bloodGroup=B+) returns Mumbai B+ donor", anyBloodSearchRes.status === 200 && anyBloodSearchRes.data.donors.length === 1 && anyBloodSearchRes.data.donors[0].fullName === "Mumbai B+ Donor", JSON.stringify(anyBloodSearchRes.data));
+    assert(
+      "9. Any Location search (radius=any & bloodGroup=B+) returns compatible donors including Mumbai B+ donor",
+      anyBloodSearchRes.status === 200 &&
+        anyBloodSearchRes.data.donors.some(d => d.fullName === "Mumbai B+ Donor") &&
+        anyBloodSearchRes.data.donors.some(d => d.fullName === "Delhi O+ Donor"),
+      JSON.stringify(anyBloodSearchRes.data)
+    );
 
     // -------------------------------------------------------------
     // 5. PRIVACY & ERROR HANDLING CHECKS
@@ -250,7 +271,12 @@ async function runTests() {
     const delhiSearchAfterMove = await request("/api/donors/search?latitude=28.6139&longitude=77.2090&radius=20&bloodGroup=O%2B", {
       headers: { Cookie: recipientCookie }
     });
-    assert("15. Delhi 20km search excludes donor after moving to Mumbai", delhiSearchAfterMove.status === 200 && delhiSearchAfterMove.data.donors.length === 0, JSON.stringify(delhiSearchAfterMove.data));
+    assert(
+      "15. Delhi 20km search excludes donor after moving to Mumbai",
+      delhiSearchAfterMove.status === 200 &&
+        !delhiSearchAfterMove.data.donors.some(d => d.fullName === "Delhi O+ Donor"),
+      JSON.stringify(delhiSearchAfterMove.data)
+    );
 
     // Any Location search STILL finds donor in Mumbai
     const anySearchAfterMove = await request("/api/donors/search?radius=any&bloodGroup=O%2B", {

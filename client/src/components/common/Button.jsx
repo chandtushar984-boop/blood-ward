@@ -13,25 +13,27 @@ export default function Button({
   ...props
 }) {
   const baseStyles =
-    "inline-flex items-center justify-center font-medium rounded-xl transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-60 disabled:cursor-not-allowed shadow-xs cursor-pointer";
+    "inline-flex items-center justify-center font-medium rounded-lg transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer select-none";
 
   const variantStyles = {
     primary:
-      "bg-red-600 hover:bg-red-700 text-white focus:ring-red-500 shadow-red-500/20 shadow-md",
+      "bg-[#A61B2B] hover:bg-[#8E1724] text-white focus:ring-[#A61B2B]/40 shadow-xs",
     secondary:
-      "bg-slate-900 dark:bg-slate-800 hover:bg-slate-800 dark:hover:bg-slate-700 text-white focus:ring-slate-700 shadow-slate-900/10",
+      "bg-[#315B83] hover:bg-[#264666] text-white focus:ring-[#315B83]/40 shadow-xs",
+    navy:
+      "bg-[#1E293B] hover:bg-[#0F172A] text-white focus:ring-[#1E293B]/40 shadow-xs",
     outline:
-      "border border-theme-input bg-theme-card hover:bg-theme-subtle text-theme-primary focus:ring-red-500",
+      "border border-[#E2E8F0] dark:border-[#343B47] bg-white dark:bg-[#20242C] hover:bg-[#F8FAFC] dark:hover:bg-[#252A33] hover:border-[#CBD5E1] dark:hover:border-[#343B47] text-[#1E293B] dark:text-[#F1F5F9] focus:ring-[#315B83]/20 shadow-2xs",
     ghost:
-      "text-theme-secondary hover:bg-theme-subtle hover:text-theme-primary shadow-none border-transparent focus:ring-slate-400",
+      "text-[#475569] dark:text-[#CBD5E1] hover:bg-[#F1F5F9] dark:hover:bg-[#20242C] hover:text-[#1E293B] dark:hover:text-[#F1F5F9] shadow-none border-transparent focus:ring-[#315B83]/20",
     danger:
-      "bg-rose-600 hover:bg-rose-700 text-white focus:ring-rose-500 shadow-rose-500/20",
+      "bg-[#A61B2B] hover:bg-[#8E1724] text-white focus:ring-[#A61B2B]/40 shadow-xs",
   };
 
   const sizeStyles = {
-    sm: "px-3 py-1.5 text-xs gap-1.5",
-    md: "px-4 py-2.5 text-sm gap-2",
-    lg: "px-6 py-3 text-base font-semibold gap-2.5",
+    sm: "px-2.5 py-1.5 text-xs font-medium gap-1.5",
+    md: "px-3.5 py-2 text-xs font-semibold gap-2",
+    lg: "px-5 py-2.5 text-sm font-semibold gap-2.5",
   };
 
   return (

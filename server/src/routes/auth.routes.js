@@ -15,7 +15,7 @@ router.post("/register/donor", registerDonor);
 router.post("/register/recipient", registerRecipient);
 router.post("/login", login);
 router.post("/logout", logout);
-router.get("/me", protect, getMe);
+router.get("/me", getMe);
 router.put("/me", protect, updateMe);
 
 export default router;

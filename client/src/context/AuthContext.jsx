@@ -11,27 +11,56 @@ export const AuthProvider = ({ children }) => {
 
   // Initial session check on app start
   useEffect(() => {
+    let isCancelled = false;
+
     const initAuth = async () => {
       try {
         // Attempt to fetch current user session via HttpOnly cookie
         const res = await authService.getCurrentUser();
-        if (res && res.user) {
-          setUser(res.user);
+        if (!isCancelled) {
+          if (res && res.user) {
+            setUser(res.user);
+            socketService.connect();
+          } else {
+            setUser(null);
+            socketService.disconnect();
+          }
         }
       } catch (err) {
-        // Session invalid or not logged in yet
-        socketService.disconnect();
-      setUser(null);
+        // Session invalid or not logged in yet (normal for public visitors)
+        if (!isCancelled) {
+          socketService.disconnect();
+          setUser(null);
+        }
       } finally {
-        setLoading(false);
+        if (!isCancelled) {
+          setLoading(false);
+        }
       }
     };
 
     initAuth();
+
+    const handleSessionExpired = () => {
+      socketService.disconnect();
+      setUser(null);
+    };
+
+    if (typeof window !== "undefined") {
+      window.addEventListener("bloodward:session-expired", handleSessionExpired);
+    }
+
+    return () => {
+      isCancelled = true;
+      if (typeof window !== "undefined") {
+        window.removeEventListener("bloodward:session-expired", handleSessionExpired);
+      }
+    };
   }, []);
 
   const loginUser = (userData) => {
     setUser(userData);
+    socketService.connect();
   };
 
   const logoutUser = async () => {

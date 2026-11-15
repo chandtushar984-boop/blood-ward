@@ -6,6 +6,7 @@ import {
   blockUser,
   unblockUser,
   deactivateUser,
+  verifyUser,
   getAdminRequests,
   getAdminRequestById,
   cancelAdminRequest,
@@ -24,6 +25,7 @@ router.get('/users', getAdminUsers);
 router.get('/users/:id', getAdminUserById);
 router.patch('/users/:id/block', blockUser);
 router.patch('/users/:id/unblock', unblockUser);
+router.patch('/users/:id/verification', verifyUser);
 router.delete('/users/:id', deactivateUser);
 
 router.get('/requests', getAdminRequests);

@@ -4,6 +4,8 @@ import {
   updateDonorProfile,
   updateDonorAvailability,
   searchDonors,
+  getHealthQuestionnaire,
+  updateHealthQuestionnaire,
 } from '../controllers/donorController.js';
 import { protect, restrictTo } from '../middleware/authMiddleware.js';
 
@@ -12,6 +14,8 @@ const router = express.Router();
 // Donor Profile & Availability Management (Donor Only)
 router.get('/me', protect, restrictTo('donor'), getDonorProfile);
 router.put('/me', protect, restrictTo('donor'), updateDonorProfile);
+router.get('/me/health-questionnaire', protect, restrictTo('donor'), getHealthQuestionnaire);
+router.put('/me/health-questionnaire', protect, restrictTo('donor'), updateHealthQuestionnaire);
 router.patch('/me/availability', protect, restrictTo('donor'), updateDonorAvailability);
 router.put('/me/availability', protect, restrictTo('donor'), updateDonorAvailability);
 

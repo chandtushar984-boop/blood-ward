@@ -1,3 +1,4 @@
+import './testDb.js';
 import express from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
@@ -116,6 +117,7 @@ async function runTests() {
       email: 'donor_male_gendertest@bloodward.test',
       phone: '9876543210',
       gender: 'Male',
+      dateOfBirth: '1995-05-15',
       password: 'password123',
       bloodGroup: 'O+',
     },
@@ -131,11 +133,28 @@ async function runTests() {
       email: 'donor_female_gendertest@bloodward.test',
       phone: '9876543211',
       gender: 'Female',
+      dateOfBirth: '1995-05-15',
       password: 'password123',
       bloodGroup: 'A+',
     },
   });
   assert('2. Donor registration with Female', donorFemaleRes.status === 201 && donorFemaleRes.data.user.gender === 'Female', JSON.stringify(donorFemaleRes.data));
+
+  // 2b. Donor registration with Non-binary
+  const donorNonBinaryRes = await request('/api/auth/register/donor', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: {
+      fullName: 'Non-binary Donor Test',
+      email: 'donor_nonbinary_gendertest@bloodward.test',
+      phone: '9876543219',
+      gender: 'Non-binary',
+      dateOfBirth: '1995-05-15',
+      password: 'password123',
+      bloodGroup: 'B+',
+    },
+  });
+  assert('2b. Donor registration with Non-binary', donorNonBinaryRes.status === 201 && donorNonBinaryRes.data.user.gender === 'Non-binary', JSON.stringify(donorNonBinaryRes.data));
 
   // 3. Recipient registration with Other
   const recOtherRes = await request('/api/auth/register/recipient', {
@@ -160,6 +179,7 @@ async function runTests() {
       email: 'donor_prefer_gendertest@bloodward.test',
       phone: '9876543213',
       gender: 'Prefer not to say',
+      dateOfBirth: '1995-05-15',
       password: 'password123',
       bloodGroup: 'B+',
     },
@@ -229,6 +249,7 @@ async function runTests() {
       email: 'invalid_gendertest@bloodward.test',
       phone: '9876543215',
       gender: 'random',
+      dateOfBirth: '1995-05-15',
       password: 'password123',
       bloodGroup: 'AB+',
     },
