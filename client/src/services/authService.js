@@ -9,7 +9,7 @@ export const authService = {
       const response = await api.post("/auth/login", credentials);
       return response.data;
     } catch (error) {
-      throw error.response?.data || { message: "Login failed" };
+      throw error.response?.data || { message: "Invalid login credentials" };
     }
   },
 
