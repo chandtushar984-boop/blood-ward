@@ -90,7 +90,7 @@ export default function LoginPage() {
     } catch (err) {
       console.error("Login Error:", err);
       setToastMessage(
-        err.message || "Failed to sign in. Please verify your email and password."
+        err.message || "Invalid login credentials"
       );
     } finally {
       setIsLoading(false);

@@ -262,7 +262,7 @@ export const login = async (req, res, next) => {
     const user = await User.findOne({ email: normalizedEmail }).select("+password");
 
     if (!user) {
-      return next(new AppError("Invalid email or password.", 401));
+      return next(new AppError("Invalid login credentials", 401));
     }
 
     if (user.isBlocked) {
@@ -280,7 +280,7 @@ export const login = async (req, res, next) => {
 
     const isPasswordCorrect = await user.comparePassword(password);
     if (!isPasswordCorrect) {
-      return next(new AppError("Invalid email or password.", 401));
+      return next(new AppError("Invalid login credentials", 401));
     }
 
     if (requestedRole && requestedRole !== user.role) {
